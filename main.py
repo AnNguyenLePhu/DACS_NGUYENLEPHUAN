@@ -1,19 +1,19 @@
-﻿# =============================================================================
+# =============================================================================
 # main.py
-# Pipeline dá»± Ä‘oÃ¡n giÃ¡ Ä‘Ã³ng cá»­a VN30 â€” chia thÃ nh 12 hÃ m step rÃµ rÃ ng.
+# Pipeline dự đoán giá đóng cửa VN30 — chia thành 12 hàm step rõ ràng.
 #
-# STEP 01  step01_load_validate()       â€” Äá»c CSV, kiá»ƒm tra cÆ¡ báº£n
-# STEP 02  step02_handle_missing()      â€” Xá»­ lÃ½ missing (chá»‰ ffill, khÃ´ng bfill)
-# STEP 03  step03_feature_engineering() â€” TÃ­nh chá»‰ bÃ¡o ká»¹ thuáº­t (per-ticker)
-# STEP 04  step04_clean_features()      â€” XÃ³a NaN sau FE, kiá»ƒm tra leakage
-# STEP 05  step05_split()               â€” Chronological split 70/15/15
-# STEP 06  step06_save_pretrain()       â€” LÆ°u data/artifacts trÆ°á»›c khi train
-# STEP 07  step07_scale()               â€” Fit scaler CHá»ˆ trÃªn train
-# STEP 08  step08_sliding_windows()     â€” Táº¡o X/Y windows 3 ká»‹ch báº£n
-# STEP 09  step09_train()               â€” Train 6 model (anti-overfit callbacks)
-# STEP 10  step10_predict_evaluate()    â€” Dá»± bÃ¡o, inverse transform, metrics
-# STEP 11  step11_overfitting_audit()   â€” Kiá»ƒm tra overfit/lazy/copy giÃ¡
-# STEP 12  step12_ensemble_and_save()   â€” Ensemble + lÆ°u káº¿t quáº£ tá»•ng há»£p
+# STEP 01  step01_load_validate()       — Đọc CSV, kiểm tra cơ bản
+# STEP 02  step02_handle_missing()      — Xử lý missing (chỉ ffill, không bfill)
+# STEP 03  step03_feature_engineering() — Tính chỉ báo kỹ thuật (per-ticker)
+# STEP 04  step04_clean_features()      — Xóa NaN sau FE, kiểm tra leakage
+# STEP 05  step05_split()               — Chronological split 70/15/15
+# STEP 06  step06_save_pretrain()       — Lưu data/artifacts trước khi train
+# STEP 07  step07_scale()               — Fit scaler CHỈ trên train
+# STEP 08  step08_sliding_windows()     — Tạo X/Y windows 3 kịch bản
+# STEP 09  step09_train()               — Train 6 model (anti-overfit callbacks)
+# STEP 10  step10_predict_evaluate()    — Dự báo, inverse transform, metrics
+# STEP 11  step11_overfitting_audit()   — Kiểm tra overfit/lazy/copy giá
+# STEP 12  step12_ensemble_and_save()   — Ensemble + lưu kết quả tổng hợp
 # =============================================================================
 
 import os
@@ -66,7 +66,7 @@ from config import (
     MIN_PRED_MOVE_STD, ZERO_MOVE_PENALTY_WEIGHT, RETURN_CORR_LOSS_WEIGHT,
     PASS_REQUIRE_BEATS_NAIVE, PASS_MIN_DA, PASS_REQUIRE_MAPE_BEAT, PASS_MAX_COPY_RATIO,
     MIN_MOVE_RATIO,
-    # [FIX] Háº±ng sá»‘ má»›i cho CopyRatio thá»±c sá»± vÃ  lazy/DA thresholds
+    # [FIX] Hằng số mới cho CopyRatio thực sự và lazy/DA thresholds
     COPY_PRICE_REL_THRESHOLD, MAX_LAZY_RATIO, MIN_DA_PASS,
     USE_RETURN_CALIBRATION, RETURN_SCALE_CANDIDATES,
 )
@@ -75,92 +75,92 @@ tf.random.set_seed(SEED)
 np.random.seed(SEED)
 
 # =============================================================================
-# STEP 01 â€” LOAD & VALIDATE
+# STEP 01 — LOAD & VALIDATE
 # =============================================================================
 
 def step01_load_validate(filepath: str) -> pd.DataFrame:
     """
-    Äá»c CSV gá»‘c, kiá»ƒm tra cÆ¡ báº£n: shape, dtypes, duplicates, sort.
-    KHÃ”NG xá»­ lÃ½ missing á»Ÿ bÆ°á»›c nÃ y.
+    Đọc CSV gốc, kiểm tra cơ bản: shape, dtypes, duplicates, sort.
+    KHÔNG xử lý missing ở bước này.
     """
-    _banner("STEP 01 â€” LOAD & VALIDATE")
+    _banner("STEP 01 — LOAD & VALIDATE")
 
     df = pd.read_csv(filepath)
     _log(f"File         : '{filepath}'")
     _log(f"Shape (raw)  : {df.shape}")
 
-    # Parse ngÃ y
+    # Parse ngày
     df["TradingDate"] = pd.to_datetime(df["TradingDate"], errors="coerce")
     bad_dates = df["TradingDate"].isna().sum()
     if bad_dates:
-        _warn(f"{bad_dates} rows cÃ³ TradingDate khÃ´ng há»£p lá»‡ â†’ drop")
+        _warn(f"{bad_dates} rows có TradingDate không hợp lệ → drop")
         df = df.dropna(subset=["TradingDate"])
 
-    # Sort â€” Báº®T BUá»˜C trÆ°á»›c má»i thao tÃ¡c
+    # Sort — BẮT BUỘC trước mọi thao tác
     df = df.sort_values(["Ticker", "TradingDate"]).reset_index(drop=True)
 
     # Drop duplicates
     n_dup = df.duplicated(subset=["Ticker", "TradingDate"]).sum()
     if n_dup:
-        _warn(f"{n_dup} dÃ²ng duplicate (Ticker, Date) â†’ drop")
+        _warn(f"{n_dup} dòng duplicate (Ticker, Date) → drop")
         df = df.drop_duplicates(subset=["Ticker", "TradingDate"]).reset_index(drop=True)
 
-    # Drop Close <= 0 (lá»—i dá»¯ liá»‡u: VIB 2018-07-23)
+    # Drop Close <= 0 (lỗi dữ liệu: VIB 2018-07-23)
     bad_close = df["Close"] <= 0
     if bad_close.any():
-        _warn(f"Drop {bad_close.sum()} dÃ²ng Close<=0: "
+        _warn(f"Drop {bad_close.sum()} dòng Close<=0: "
               f"{df.loc[bad_close, ['Ticker','TradingDate','Close']].values.tolist()}")
         df = df[~bad_close].reset_index(drop=True)
 
     tickers = sorted(df["Ticker"].unique().tolist())
-    _log(f"Tickers      : {len(tickers)} â€” {tickers}")
+    _log(f"Tickers      : {len(tickers)} — {tickers}")
     _log(f"Rows         : {len(df):,}")
-    _log(f"Date range   : {df['TradingDate'].min().date()} â†’ {df['TradingDate'].max().date()}")
+    _log(f"Date range   : {df['TradingDate'].min().date()} → {df['TradingDate'].max().date()}")
     _log(f"Missing      : {df[['Open','High','Low','Close','Volume','VN30_Close','VN30_Volume']].isna().sum().to_dict()}")
     return df
 
 
 # =============================================================================
-# STEP 02 â€” HANDLE MISSING
+# STEP 02 — HANDLE MISSING
 # =============================================================================
 
 def step02_handle_missing(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Xá»­ lÃ½ NaN cho cÃ¡c cá»™t OHLCV vÃ  VN30.
-    Chá»‰ ffill (forward fill) â€” TUYá»†T Äá»I KHÃ”NG bfill.
-    bfill dÃ¹ng dá»¯ liá»‡u tÆ°Æ¡ng lai Ä‘á»ƒ láº¥p quÃ¡ khá»© â†’ data leakage.
-    Drop náº¿u Ä‘áº§u chuá»—i váº«n cÃ²n NaN (chÆ°a cÃ³ giÃ¡ trá»‹ trÆ°á»›c Ä‘á»ƒ ffill).
+    Xử lý NaN cho các cột OHLCV và VN30.
+    Chỉ ffill (forward fill) — TUYỆT ĐỐI KHÔNG bfill.
+    bfill dùng dữ liệu tương lai để lấp quá khứ → data leakage.
+    Drop nếu đầu chuỗi vẫn còn NaN (chưa có giá trị trước để ffill).
     """
-    _banner("STEP 02 â€” HANDLE MISSING")
+    _banner("STEP 02 — HANDLE MISSING")
 
     fill_cols = ["Open", "High", "Low", "Close", "Volume", "VN30_Close", "VN30_Volume"]
     before = df[fill_cols].isna().sum()
-    _log(f"Missing trÆ°á»›c ffill: {before[before > 0].to_dict()}")
+    _log(f"Missing trước ffill: {before[before > 0].to_dict()}")
 
-    # ffill theo tá»«ng ticker â€” KHÃ”NG bfill
+    # ffill theo từng ticker — KHÔNG bfill
     df[fill_cols] = df.groupby("Ticker")[fill_cols].transform(lambda g: g.ffill())
 
     still_na = df[fill_cols].isna().sum().sum()
     if still_na:
-        _warn(f"CÃ²n {still_na} NaN sau ffill (Ä‘áº§u chuá»—i) â†’ drop")
+        _warn(f"Còn {still_na} NaN sau ffill (đầu chuỗi) → drop")
         df = df.dropna(subset=fill_cols).reset_index(drop=True)
 
     after = df[fill_cols].isna().sum().sum()
-    _log(f"Missing sau xá»­ lÃ½: {after}  âœ“")
+    _log(f"Missing sau xử lý: {after}  ✓")
     _log(f"Shape sau clean  : {df.shape}")
 
-    assert after == 0, "CÃ²n NaN sau step02!"
+    assert after == 0, "Còn NaN sau step02!"
     return df
 
 
 # =============================================================================
-# STEP 03 â€” FEATURE ENGINEERING (per-ticker)
+# STEP 03 — FEATURE ENGINEERING (per-ticker)
 # =============================================================================
 
 def _fe_one_ticker(df_t: pd.DataFrame) -> pd.DataFrame:
     """
-    TÃ­nh chá»‰ bÃ¡o ká»¹ thuáº­t cho 1 ticker.
-    Chá»‰ dÃ¹ng shift/rolling/ewm theo chiá»u quÃ¡ khá»© â€” KHÃ”NG look-ahead.
+    Tính chỉ báo kỹ thuật cho 1 ticker.
+    Chỉ dùng shift/rolling/ewm theo chiều quá khứ — KHÔNG look-ahead.
     """
     t   = df_t.copy().reset_index(drop=True)
     c   = t["Close"]
@@ -170,7 +170,7 @@ def _fe_one_ticker(df_t: pd.DataFrame) -> pd.DataFrame:
     vol = t["Volume"].clip(lower=0)
     eps = 1e-9
 
-    # â”€â”€ Returns â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Returns ──────────────────────────────────────────────────────────────
     t["return_1d"]    = c.pct_change()
     t["log_return_1d"] = np.log((c / (c.shift(1) + eps)).clip(lower=eps))
 
@@ -180,7 +180,7 @@ def _fe_one_ticker(df_t: pd.DataFrame) -> pd.DataFrame:
     t["volatility_5d"] = t["log_return_1d"].rolling(5).std()
     t["volatility_10d"] = t["log_return_1d"].rolling(10).std()
 
-    # â”€â”€ Spread ná»™i ngÃ y â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Spread nội ngày ──────────────────────────────────────────────────────
     t["HL_Range"]  = h - lo
     t["OC_Change"] = c - o
     t["open_close_ratio"] = o / (c + eps) - 1
@@ -189,10 +189,10 @@ def _fe_one_ticker(df_t: pd.DataFrame) -> pd.DataFrame:
     t["hl_range_ratio"] = (h - lo) / (c + eps)
     t["oc_change_ratio"] = (c - o) / (c + eps)
 
-    # â”€â”€ Volume â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Volume ───────────────────────────────────────────────────────────────
     t["Volume_Change"] = np.log((vol / (vol.shift(1) + eps)).clip(lower=eps))
 
-    # â”€â”€ Moving Averages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Moving Averages ──────────────────────────────────────────────────────
     t["MA5"]  = c.rolling(5).mean()
     t["MA10"] = c.rolling(10).mean()
     t["MA20"] = c.rolling(20).mean()
@@ -206,25 +206,25 @@ def _fe_one_ticker(df_t: pd.DataFrame) -> pd.DataFrame:
     t["ma10_close_ratio"] = t["MA10"] / (c + eps) - 1
     t["ma20_close_ratio"] = t["MA20"] / (c + eps) - 1
 
-    # â”€â”€ EMA (log-return Ä‘á»ƒ stationary) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── EMA (log-return để stationary) ───────────────────────────────────────
     ema12 = c.ewm(span=12, adjust=False).mean()
     ema26 = c.ewm(span=26, adjust=False).mean()
     t["EMA12"] = np.log((ema12 / (ema12.shift(1) + eps)).clip(lower=eps))
     t["EMA26"] = np.log((ema26 / (ema26.shift(1) + eps)).clip(lower=eps))
 
-    # â”€â”€ RSI(14) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── RSI(14) ──────────────────────────────────────────────────────────────
     delta   = c.diff()
     avg_g   = delta.clip(lower=0).ewm(alpha=1/14, min_periods=14, adjust=False).mean()
     avg_l   = (-delta.clip(upper=0)).ewm(alpha=1/14, min_periods=14, adjust=False).mean()
     t["RSI14"] = 100.0 - (100.0 / (1.0 + avg_g / (avg_l + eps)))
 
-    # â”€â”€ MACD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── MACD ─────────────────────────────────────────────────────────────────
     macd_line      = ema12 - ema26
     macd_signal    = macd_line.ewm(span=9, adjust=False).mean()
     t["MACD"]        = macd_line
     t["MACD_Signal"] = macd_signal
 
-    # â”€â”€ Bollinger Bands (20, 2Ïƒ) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Bollinger Bands (20, 2σ) ─────────────────────────────────────────────
     bb_mid        = c.rolling(20).mean()
     bb_std        = c.rolling(20).std()
     t["BB_Upper"] = bb_mid + 2 * bb_std
@@ -232,7 +232,7 @@ def _fe_one_ticker(df_t: pd.DataFrame) -> pd.DataFrame:
     t["bb_upper_close_ratio"] = t["BB_Upper"] / (c + eps) - 1
     t["bb_lower_close_ratio"] = t["BB_Lower"] / (c + eps) - 1
 
-    # â”€â”€ ATR(14) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── ATR(14) ───────────────────────────────────────────────────────────────
     tr = pd.concat([
         h - lo,
         (h - c.shift(1)).abs(),
@@ -241,12 +241,12 @@ def _fe_one_ticker(df_t: pd.DataFrame) -> pd.DataFrame:
     t["ATR14"] = tr.rolling(14).mean()
     t["atr14_close_ratio"] = t["ATR14"] / (c + eps)
 
-    # â”€â”€ Gap_Flag (khoáº£ng trá»‘ng giao dá»‹ch) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Gap_Flag (khoảng trống giao dịch) ────────────────────────────────────
     days_gap      = t["TradingDate"].diff().dt.days.fillna(1)
     t["Gap_Flag"] = (days_gap > 5).astype(int)
 
-    # â”€â”€ [NEW] Breakout features â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    # Rolling High/Low 20 phiÃªn (shift(1): chá»‰ dÃ¹ng dá»¯ liá»‡u quÃ¡ khá»©, khÃ´ng look-ahead)
+    # ── [NEW] Breakout features ──────────────────────────────────────────
+    # Rolling High/Low 20 phiên (shift(1): chỉ dùng dữ liệu quá khứ, không look-ahead)
     t["rolling_max_20"] = c.rolling(20).max()
     t["rolling_min_20"] = c.rolling(20).min()
     t["rolling_max20_close_ratio"] = t["rolling_max_20"] / (c + eps) - 1
@@ -267,54 +267,54 @@ def _fe_one_ticker(df_t: pd.DataFrame) -> pd.DataFrame:
 
 def step03_feature_engineering(df: pd.DataFrame) -> dict:
     """
-    Cháº¡y FE cho táº¥t cáº£ tickers. Tráº£ vá» dict {ticker: DataFrame}.
+    Chạy FE cho tất cả tickers. Trả về dict {ticker: DataFrame}.
     """
-    _banner("STEP 03 â€” FEATURE ENGINEERING")
+    _banner("STEP 03 — FEATURE ENGINEERING")
     result = {}
     for ticker in sorted(df["Ticker"].unique()):
         df_t  = df[df["Ticker"] == ticker].copy()
         df_fe = _fe_one_ticker(df_t)
         result[ticker] = df_fe
         _log(f"[{ticker}] {len(df_fe):,} rows | indicators computed")
-    _log(f"Tá»•ng: {len(result)} tickers")
+    _log(f"Tổng: {len(result)} tickers")
     return result
 
 
 # =============================================================================
-# STEP 04 â€” CLEAN FEATURES (dropna, validate, no bfill)
+# STEP 04 — CLEAN FEATURES (dropna, validate, no bfill)
 # =============================================================================
 
 def step04_clean_features(feat_dict: dict) -> dict:
     """
-    XÃ³a NaN sau FE báº±ng dropna() â€” KHÃ”NG ffill/bfill trÃªn FEATURE_COLS.
-    Kiá»ƒm tra: khÃ´ng NaN, khÃ´ng Inf, Ä‘á»§ MIN_TICKER_ROWS.
-    Tráº£ vá» dict {ticker: DataFrame} (loáº¡i ticker khÃ´ng Ä‘á»§ dá»¯ liá»‡u).
+    Xóa NaN sau FE bằng dropna() — KHÔNG ffill/bfill trên FEATURE_COLS.
+    Kiểm tra: không NaN, không Inf, đủ MIN_TICKER_ROWS.
+    Trả về dict {ticker: DataFrame} (loại ticker không đủ dữ liệu).
     """
-    _banner("STEP 04 â€” CLEAN FEATURES")
+    _banner("STEP 04 — CLEAN FEATURES")
     clean = {}
     for ticker, df_fe in feat_dict.items():
-        # dropna CHá»ˆ trÃªn FEATURE_COLS â€” khÃ´ng fill
+        # dropna CHỈ trên FEATURE_COLS — không fill
         df_c = df_fe.dropna(subset=FEATURE_COLS).reset_index(drop=True)
 
-        # Kiá»ƒm tra Inf
+        # Kiểm tra Inf
         inf_count = np.isinf(df_c[FEATURE_COLS].values.astype(float)).sum()
         if inf_count:
-            _warn(f"[{ticker}] {inf_count} Inf values â†’ drop")
+            _warn(f"[{ticker}] {inf_count} Inf values → drop")
             df_c = df_c.replace([np.inf, -np.inf], np.nan)
             df_c = df_c.dropna(subset=FEATURE_COLS).reset_index(drop=True)
 
         if len(df_c) < MIN_TICKER_ROWS:
-            _warn(f"[{ticker}] Bá» qua â€” chá»‰ {len(df_c)} rows sau dropna (cáº§n â‰¥ {MIN_TICKER_ROWS})")
+            _warn(f"[{ticker}] Bỏ qua — chỉ {len(df_c)} rows sau dropna (cần ≥ {MIN_TICKER_ROWS})")
             continue
 
-        # XÃ¡c nháº­n khÃ´ng cÃ²n NaN/Inf
-        assert df_c[FEATURE_COLS].isna().sum().sum() == 0, f"[{ticker}] cÃ²n NaN!"
-        assert not np.isinf(df_c[FEATURE_COLS].values.astype(float)).any(), f"[{ticker}] cÃ²n Inf!"
+        # Xác nhận không còn NaN/Inf
+        assert df_c[FEATURE_COLS].isna().sum().sum() == 0, f"[{ticker}] còn NaN!"
+        assert not np.isinf(df_c[FEATURE_COLS].values.astype(float)).any(), f"[{ticker}] còn Inf!"
 
         clean[ticker] = df_c
         _log(f"[{ticker}] {len(df_c):,} rows | {N_FEATURES} features | OK")
 
-    _log(f"Tá»•ng há»£p lá»‡: {len(clean)}/{len(feat_dict)} tickers")
+    _log(f"Tổng hợp lệ: {len(clean)}/{len(feat_dict)} tickers")
     return clean
 
 
@@ -333,8 +333,8 @@ def keep_common_trading_dates(
     This ensures all VN30 tickers are aligned on the same calendar.
 
     Returns:
-        filtered      â€” DataFrame with only common-date rows
-        ticker_count  â€” per-date ticker count (used for the report)
+        filtered      — DataFrame with only common-date rows
+        ticker_count  — per-date ticker count (used for the report)
     """
     temp = df.copy()
     temp[date_col] = pd.to_datetime(temp[date_col])
@@ -384,7 +384,7 @@ def get_global_split_dates(
     if len(all_dates) < 10:
         raise ValueError(
             "Not enough common trading dates after strict filtering. "
-            f"Got {len(all_dates)} dates â€” need at least 10."
+            f"Got {len(all_dates)} dates — need at least 10."
         )
 
     n_dates      = len(all_dates)
@@ -397,7 +397,7 @@ def get_global_split_dates(
         raise ValueError("val_end_idx <= train_end_idx. Check VAL_RATIO.")
     if val_end_idx >= n_dates:
         raise ValueError(
-            "val_end_idx >= n_dates â€” test split would be empty. "
+            "val_end_idx >= n_dates — test split would be empty. "
             "Reduce TRAIN_RATIO + VAL_RATIO so that TEST_RATIO > 0."
         )
 
@@ -410,7 +410,7 @@ def get_global_split_dates(
     print(f"  Train  dates               : {train_end_idx}  "
           f"(up to {pd.Timestamp(train_end_date).date()})")
     print(f"  Val    dates               : {val_end_idx - train_end_idx}  "
-          f"({pd.Timestamp(all_dates[train_end_idx]).date()} â†’ "
+          f"({pd.Timestamp(all_dates[train_end_idx]).date()} → "
           f"{pd.Timestamp(val_end_date).date()})")
     print(f"  Test   dates               : {n_dates - val_end_idx}  "
           f"(from {pd.Timestamp(test_start_date).date()})")
@@ -462,7 +462,7 @@ def save_global_split_summary(
         ("test",       test_df),
     ]:
         if part.empty:
-            raise ValueError(f"{split_name} split is empty â€” cannot save summary.")
+            raise ValueError(f"{split_name} split is empty — cannot save summary.")
 
         summary = (
             part.groupby(ticker_col)[date_col]
@@ -481,13 +481,13 @@ def save_global_split_summary(
         print(f"\n========== {split_name.upper()} SPLIT SUMMARY ==========")
         print(f"  Rows    : {len(part):,}")
         print(f"  Tickers : {part[ticker_col].nunique()}")
-        print(f"  Date range: {part[date_col].min().date()} â†’ "
+        print(f"  Date range: {part[date_col].min().date()} → "
               f"{part[date_col].max().date()}")
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     report = pd.DataFrame(rows)
     report.to_csv(output_path, index=False, encoding="utf-8-sig")
-    print(f"\n  Saved global split summary â†’ {output_path}")
+    print(f"\n  Saved global split summary → {output_path}")
     return report
 
 
@@ -510,9 +510,9 @@ def _validate_global_split(
         if n_t != expected_tickers:
             raise ValueError(
                 f"[VALIDATION FAIL] {name} split has {n_t} tickers "
-                f"â€” expected {expected_tickers}."
+                f"— expected {expected_tickers}."
             )
-        _log(f"[{name:10s}] tickers={n_t} âœ“")
+        _log(f"[{name:10s}] tickers={n_t} ✓")
 
     # All tickers share the same date boundaries within each split
     for name, part in [("train", train_df), ("validation", val_df), ("test", test_df)]:
@@ -520,15 +520,15 @@ def _validate_global_split(
         ends   = part.groupby(ticker_col)[date_col].max()
         if starts.nunique() != 1:
             raise ValueError(
-                f"[VALIDATION FAIL] {name} split â€” tickers have different start dates:\n"
+                f"[VALIDATION FAIL] {name} split — tickers have different start dates:\n"
                 f"{starts.value_counts()}"
             )
         if ends.nunique() != 1:
             raise ValueError(
-                f"[VALIDATION FAIL] {name} split â€” tickers have different end dates:\n"
+                f"[VALIDATION FAIL] {name} split — tickers have different end dates:\n"
                 f"{ends.value_counts()}"
             )
-        _log(f"[{name:10s}] all tickers share same start/end dates âœ“")
+        _log(f"[{name:10s}] all tickers share same start/end dates ✓")
 
     # No overlap between splits
     tr_dates = set(train_df[date_col].unique())
@@ -550,7 +550,7 @@ def _validate_global_split(
             f"[VALIDATION FAIL] Overlap between train and test: "
             f"{sorted(tr_dates & te_dates)[:5]} ..."
         )
-    _log("No date overlap between splits âœ“")
+    _log("No date overlap between splits ✓")
 
     # Chronological order: train_end < val_start < test_start
     tr_end   = train_df[date_col].max()
@@ -569,13 +569,13 @@ def _validate_global_split(
             f"test_start ({te_start.date()})."
         )
     _log(f"Chronological order: train_end={tr_end.date()} < "
-         f"val_start={va_start.date()} < test_start={te_start.date()} âœ“")
+         f"val_start={va_start.date()} < test_start={te_start.date()} ✓")
 
-    _log("All validation checks PASSED âœ“")
+    _log("All validation checks PASSED ✓")
 
 
 # =============================================================================
-# STEP 05 â€” CHRONOLOGICAL SPLIT 70/15/15 (per-ticker slice of global split)
+# STEP 05 — CHRONOLOGICAL SPLIT 70/15/15 (per-ticker slice of global split)
 # =============================================================================
 
 def step05_split(
@@ -584,16 +584,16 @@ def step05_split(
     val_end_date=None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
     """
-    Chia theo thá»© tá»± thá»i gian â€” KHÃ”NG shuffle, KHÃ”NG random_state.
+    Chia theo thứ tự thời gian — KHÔNG shuffle, KHÔNG random_state.
 
-    Khi USE_STRICT_COMMON_DATES=True, nháº­n train_end_date / val_end_date tá»«
-    get_global_split_dates() vÃ  slice ticker theo ranh giá»›i ngÃ y chung Ä‘Ã³.
-    Khi False (legacy), tá»± tÃ­nh theo tá»‰ lá»‡ riÃªng cá»§a ticker.
+    Khi USE_STRICT_COMMON_DATES=True, nhận train_end_date / val_end_date từ
+    get_global_split_dates() và slice ticker theo ranh giới ngày chung đó.
+    Khi False (legacy), tự tính theo tỉ lệ riêng của ticker.
 
     Returns (df_train, df_val, df_test, split_info).
     """
     if train_end_date is not None and val_end_date is not None:
-        # â”€â”€ Global date split (Option A) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # ── Global date split (Option A) ─────────────────────────────────────
         date_col = "TradingDate"
         df_ticker = df_ticker.copy()
         df_ticker[date_col] = pd.to_datetime(df_ticker[date_col])
@@ -605,7 +605,7 @@ def step05_split(
         ].copy()
         df_te = df_ticker[df_ticker[date_col] > val_end_date].copy()
     else:
-        # â”€â”€ Legacy per-ticker split â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # ── Legacy per-ticker split ───────────────────────────────────────────
         n    = len(df_ticker)
         n_tr = int(n * TRAIN_RATIO)
         n_va = int(n * VAL_RATIO)
@@ -633,15 +633,15 @@ def step05_split(
         "test_start":  str(df_te["TradingDate"].iloc[0].date()),
         "test_end":    str(df_te["TradingDate"].iloc[-1].date()),
     }
-    _log(f"  Train {len(df_tr):,}  ({info['train_start']} â†’ {info['train_end']})")
-    _log(f"  Val   {len(df_va):,}  ({info['val_start']}   â†’ {info['val_end']})")
-    _log(f"  Test  {len(df_te):,}  ({info['test_start']}  â†’ {info['test_end']})")
+    _log(f"  Train {len(df_tr):,}  ({info['train_start']} → {info['train_end']})")
+    _log(f"  Val   {len(df_va):,}  ({info['val_start']}   → {info['val_end']})")
+    _log(f"  Test  {len(df_te):,}  ({info['test_start']}  → {info['test_end']})")
     return df_tr, df_va, df_te, info
 
 
 
 # =============================================================================
-# STEP 06 â€” SAVE PRE-TRAIN ARTIFACTS
+# STEP 06 — SAVE PRE-TRAIN ARTIFACTS
 # =============================================================================
 
 def step06_save_pretrain(
@@ -655,14 +655,14 @@ def step06_save_pretrain(
     out_root: str,
 ) -> str:
     """
-    LÆ°u data trÆ°á»›c khi train:
+    Lưu data trước khi train:
       {out_root}/{ticker}/{scenario}/
-        â”œâ”€â”€ processed_full.csv
-        â”œâ”€â”€ train.csv / val.csv / test.csv
-        â”œâ”€â”€ split_info.json
-        â””â”€â”€ feature_list.json
-    Scaler (pkl) Ä‘Æ°á»£c lÆ°u sau khi fit á»Ÿ step07.
-    Returns thÆ° má»¥c Ä‘Ã£ lÆ°u.
+        ├── processed_full.csv
+        ├── train.csv / val.csv / test.csv
+        ├── split_info.json
+        └── feature_list.json
+    Scaler (pkl) được lưu sau khi fit ở step07.
+    Returns thư mục đã lưu.
     """
     folder = os.path.join(out_root, ticker, scenario["name"])
     os.makedirs(folder, exist_ok=True)
@@ -709,12 +709,12 @@ def step06_save_pretrain(
 
     with open(os.path.join(folder, "target_info.json"), "w", encoding="utf-8") as f:
         json.dump(target_info, f, indent=2, ensure_ascii=False)
-    _log(f"[{ticker}|{scenario['name']}] Pre-train artifacts â†’ {folder}")
+    _log(f"[{ticker}|{scenario['name']}] Pre-train artifacts → {folder}")
     return folder
 
 
 # =============================================================================
-# STEP 07 â€” SCALE (fit CHá»ˆ trÃªn train)
+# STEP 07 — SCALE (fit CHỈ trên train)
 # =============================================================================
 
 def step07_scale(
@@ -724,21 +724,21 @@ def step07_scale(
     folder: str,
 ) -> tuple:
     """
-    MinMaxScaler(X): fit CHá»ˆ trÃªn train, transform val+test.
-    LÆ°u scaler_x.pkl vÃ  scaler_y.pkl vÃ o folder.
-    target_scaler (StandardScaler cho Y) Ä‘Æ°á»£c fit á»Ÿ step08 sau khi táº¡o windows.
+    MinMaxScaler(X): fit CHỈ trên train, transform val+test.
+    Lưu scaler_x.pkl và scaler_y.pkl vào folder.
+    target_scaler (StandardScaler cho Y) được fit ở step08 sau khi tạo windows.
 
     Returns (scaler_x, tr_scaled, va_scaled, te_scaled,
              tr_dates, va_dates, te_dates,
              raw_close_tr, raw_close_va, raw_close_te)
     """
     scaler_x   = MinMaxScaler(feature_range=(0, 1))
-    tr_scaled  = scaler_x.fit_transform(df_tr[FEATURE_COLS].values)   # fit CHá»ˆ train
-    va_scaled  = scaler_x.transform(df_va[FEATURE_COLS].values)       # transform báº±ng scaler train
-    te_scaled  = scaler_x.transform(df_te[FEATURE_COLS].values)       # transform báº±ng scaler train
+    tr_scaled  = scaler_x.fit_transform(df_tr[FEATURE_COLS].values)   # fit CHỈ train
+    va_scaled  = scaler_x.transform(df_va[FEATURE_COLS].values)       # transform bằng scaler train
+    te_scaled  = scaler_x.transform(df_te[FEATURE_COLS].values)       # transform bằng scaler train
 
     joblib.dump(scaler_x, os.path.join(folder, "scaler_x.pkl"))
-    _log(f"  scaler_x fit on train ({len(df_tr)} rows) â€” saved scaler_x.pkl")
+    _log(f"  scaler_x fit on train ({len(df_tr)} rows) — saved scaler_x.pkl")
 
     return (
         scaler_x,
@@ -751,7 +751,7 @@ def step07_scale(
 
 
 # =============================================================================
-# STEP 08 â€” SLIDING WINDOWS
+# STEP 08 — SLIDING WINDOWS
 # =============================================================================
 
 def _make_windows(
@@ -766,9 +766,9 @@ def _make_windows(
 ) -> tuple:
     """
     X[i]      = scaled[i-lookback : i]   shape (lookback, N_FEATURES)
-    Y[i]      = log_return táº¡i [i..i+horizon-1]  shape (horizon,)
-    Y_dates   = dates tÆ°Æ¡ng á»©ng vá»›i Y
-    last_close= Close táº¡i i-1 (Ä‘á»ƒ inverse vá» giÃ¡)
+    Y[i]      = log_return tại [i..i+horizon-1]  shape (horizon,)
+    Y_dates   = dates tương ứng với Y
+    last_close= Close tại i-1 (để inverse về giá)
     """
     if context_scaled is not None:
         scaled    = np.concatenate([context_scaled, scaled], axis=0)
@@ -783,7 +783,7 @@ def _make_windows(
         X.append(scaled[i - lookback : i])
         Y.append(log_ret)
         Y_dates.append(dates[i : i + horizon])
-        last_close.append(close_w[0])                      # Close táº¡i t-1
+        last_close.append(close_w[0])                      # Close tại t-1
 
     if not X:
         return None, None, None, None
@@ -803,8 +803,8 @@ def step08_sliding_windows(
     folder: str,
 ) -> tuple | None:
     """
-    Táº¡o sliding windows cho 3 táº­p. Fit StandardScaler trÃªn Y_train.
-    LÆ°u scaler_y.pkl. Returns None náº¿u khÃ´ng Ä‘á»§ windows.
+    Tạo sliding windows cho 3 tập. Fit StandardScaler trên Y_train.
+    Lưu scaler_y.pkl. Returns None nếu không đủ windows.
     """
     lb = scenario["lookback"]
     h  = scenario["horizon"]
@@ -824,16 +824,16 @@ def step08_sliding_windows(
     )
 
     if X_tr is None or len(X_tr) < 10 or X_va is None or len(X_va) < 1 or X_te is None or len(X_te) < 1:
-        _warn(f"  KhÃ´ng Ä‘á»§ windows (tr={0 if X_tr is None else len(X_tr)}, "
+        _warn(f"  Không đủ windows (tr={0 if X_tr is None else len(X_tr)}, "
               f"va={0 if X_va is None else len(X_va)}, "
-              f"te={0 if X_te is None else len(X_te)}) â†’ bá» qua")
+              f"te={0 if X_te is None else len(X_te)}) → bỏ qua")
         return None
 
-    # StandardScaler cho Y â€” fit CHá»ˆ trÃªn Y_train
+    # StandardScaler cho Y — fit CHỈ trên Y_train
     scaler_y  = StandardScaler()
     Y_tr_s    = scaler_y.fit_transform(Y_tr.reshape(-1, 1)).reshape(Y_tr.shape)
     Y_va_s    = scaler_y.transform(Y_va.reshape(-1, 1)).reshape(Y_va.shape)
-    # Y_te khÃ´ng scale (chá»‰ dÃ¹ng cho inverse)
+    # Y_te không scale (chỉ dùng cho inverse)
 
     joblib.dump(scaler_y, os.path.join(folder, "scaler_y.pkl"))
 
@@ -849,14 +849,14 @@ def step08_sliding_windows(
 
 
 # =============================================================================
-# STEP 09 â€” BUILD & TRAIN MODELS
+# STEP 09 — BUILD & TRAIN MODELS
 # =============================================================================
 
-# â”€â”€ Custom loss factory: Huber + Directional penalty (scale-aware) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# BUG CÅ¨: tf.sign(y_true) so sÃ¡nh vá»›i 0 trong khÃ´ng gian scaled.
-# Sau StandardScaler, 0 khÃ´ng cÃ²n lÃ  "khÃ´ng Ä‘á»•i" thá»±c sá»±.
-# FIX: TÃ­nh y_zero_scaled = scaler_y.transform([[0.0]])[0,0] rá»“i so sÃ¡nh y - y_zero_scaled.
-DIR_PENALTY_WEIGHT = 0.30  # giá»¯ láº¡i Ä‘á»ƒ tham chiáº¿u; giÃ¡ trá»‹ thá»±c dÃ¹ng tá»« config theo horizon
+# ── Custom loss factory: Huber + Directional penalty (scale-aware) ────────────
+# BUG CŨ: tf.sign(y_true) so sánh với 0 trong không gian scaled.
+# Sau StandardScaler, 0 không còn là "không đổi" thực sự.
+# FIX: Tính y_zero_scaled = scaler_y.transform([[0.0]])[0,0] rồi so sánh y - y_zero_scaled.
+DIR_PENALTY_WEIGHT = 0.30  # giữ lại để tham chiếu; giá trị thực dùng từ config theo horizon
 
 def make_directional_huber_loss(
     y_zero_scaled: float,
@@ -868,24 +868,24 @@ def make_directional_huber_loss(
     corr_weight: float = RETURN_CORR_LOSS_WEIGHT,
 ):
     """
-    Táº¡o loss function biáº¿t vá»‹ trÃ­ 'zero return' trong khÃ´ng gian scaled.
+    Tạo loss function biết vị trí 'zero return' trong không gian scaled.
 
     Args:
         y_zero_scaled: scaler_y.transform([[0.0]])[0, 0]
-                       â€” giÃ¡ trá»‹ 0.0 log-return sau StandardScaler
-        dir_weight   : trá»ng sá»‘ penalize sai chiá»u (0.20â€“0.40)
+                       — giá trị 0.0 log-return sau StandardScaler
+        dir_weight   : trọng số penalize sai chiều (0.20–0.40)
 
     Returns:
-        loss(y_true, y_pred) â†’ scalar tensor
+        loss(y_true, y_pred) → scalar tensor
 
-    Multi-step safe: tf.reduce_mean hoáº¡t Ä‘á»™ng trÃªn má»i shape (batch, h).
+    Multi-step safe: tf.reduce_mean hoạt động trên mọi shape (batch, h).
     """
     huber_fn = tf.keras.losses.Huber(delta=HUBER_DELTA)
     mse_fn = tf.keras.losses.MeanSquaredError()
 
     def loss(y_true, y_pred):
         base_loss = huber_fn(y_true, y_pred) if USE_HUBER_LOSS else mse_fn(y_true, y_pred)
-        # So sÃ¡nh vá»›i y_zero_scaled thay vÃ¬ 0 â€” Ä‘Ã¢y lÃ  Ä‘iá»ƒm fix cá»‘t lÃµi
+        # So sánh với y_zero_scaled thay vì 0 — đây là điểm fix cốt lõi
         true_move = y_true - y_zero_scaled
         pred_move = y_pred - y_zero_scaled
         true_sign = tf.stop_gradient(tf.sign(true_move))
@@ -922,7 +922,7 @@ def make_directional_huber_loss(
 
 
 def _build_model(name: str, lookback: int, horizon: int) -> tf.keras.Model:
-    """Táº¡o model theo tÃªn. Táº¥t cáº£ dÃ¹ng padding='causal' cho Conv1D."""
+    """Tạo model theo tên. Tất cả dùng padding='causal' cho Conv1D."""
     nf = N_FEATURES
     dr = DROPOUT_RATE
     l2 = L2_LAMBDA
@@ -960,7 +960,7 @@ def _build_model(name: str, lookback: int, horizon: int) -> tf.keras.Model:
 
     out = layers.Dense(horizon)(x)
     m   = models.Model(inp, out, name=name)
-    # KhÃ´ng compile á»Ÿ Ä‘Ã¢y â€” compile vá»›i loss Ä‘Ãºng (scale-aware) trong step09_train
+    # Không compile ở đây — compile với loss đúng (scale-aware) trong step09_train
     return m
 
 
@@ -977,7 +977,7 @@ def _build_callbacks(horizon: int, ckpt_path: str) -> list:
         keras_callbacks.EarlyStopping(
             monitor=EARLY_STOPPING_MONITOR,
             patience=es_p,
-            restore_best_weights=True,    # â† giá»¯ weights tá»‘t nháº¥t
+            restore_best_weights=True,    # ← giữ weights tốt nhất
             verbose=0,
         ),
         keras_callbacks.ReduceLROnPlateau(
@@ -1001,7 +1001,7 @@ def _label_smooth(Y: np.ndarray, alpha: float = LABEL_SMOOTH_ALPHA) -> np.ndarra
 
 
 def _augment(X: np.ndarray, Y: np.ndarray) -> tuple:
-    """Gaussian noise injection Ä‘á»ƒ chá»‘ng memorization."""
+    """Gaussian noise injection để chống memorization."""
     mask = np.random.rand(len(X)) < AUG_PROB
     X_aug = X.copy()
     Y_aug = Y.copy()
@@ -1023,9 +1023,9 @@ def step09_train(
     folder: str,
 ) -> dict | None:
     """
-    Build, augment, label-smooth, train model vá»›i callbacks chá»‘ng overfit.
-    shuffle=False â€” time-series.
-    Returns dict káº¿t quáº£ hoáº·c None náº¿u lá»—i.
+    Build, augment, label-smooth, train model với callbacks chống overfit.
+    shuffle=False — time-series.
+    Returns dict kết quả hoặc None nếu lỗi.
     """
     lb = scenario["lookback"]
     h  = scenario["horizon"]
@@ -1036,8 +1036,8 @@ def step09_train(
     ckpt_path = os.path.join(folder, f"best_{model_name}_{sc}.keras")
     cbs       = _build_callbacks(h, ckpt_path)
 
-    # â”€â”€ [FIX 1] Compile vá»›i loss factory biáº¿t y_zero_scaled â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    # scaler_y Ä‘Ã£ fit trÃªn Y_train (log-return raw) â†’ transform([[0.0]]) cho Ä‘iá»ƒm "0 return"
+    # ── [FIX 1] Compile với loss factory biết y_zero_scaled ─────────────────
+    # scaler_y đã fit trên Y_train (log-return raw) → transform([[0.0]]) cho điểm "0 return"
     y_zero_scaled = float(w["scaler_y"].transform([[0.0]])[0, 0])
     dir_weight_map = {1: DIR_LOSS_WEIGHT_H1, 3: DIR_LOSS_WEIGHT_H3, 7: DIR_LOSS_WEIGHT_H7}
     dir_w = dir_weight_map.get(h, 0.30)
@@ -1052,24 +1052,24 @@ def step09_train(
     X_tr_aug, Y_tr_aug = _augment(w["X_tr"], w["Y_tr_s"])
     Y_smooth = _label_smooth(Y_tr_aug)
 
-    # â”€â”€ [FIX 2] Sample weights: dÃ¹ng Y_tr RAW (log-return gá»‘c), khÃ´ng dÃ¹ng scaled â”€â”€
-    # HIGH_VOL_THRESHOLD = 0.015 lÃ  ngÆ°á»¡ng log-return thá»±c (khÃ´ng pháº£i scaled).
-    # w["Y_tr"] shape (N, h) â€” dÃ¹ng max abs trÃªn táº¥t cáº£ horizon steps.
+    # ── [FIX 2] Sample weights: dùng Y_tr RAW (log-return gốc), không dùng scaled ──
+    # HIGH_VOL_THRESHOLD = 0.015 là ngưỡng log-return thực (không phải scaled).
+    # w["Y_tr"] shape (N, h) — dùng max abs trên tất cả horizon steps.
     sw = None
     if USE_SAMPLE_WEIGHTS:
-        abs_y_raw = np.max(np.abs(w["Y_tr"]), axis=1)   # (N,) â€” raw log-return
+        abs_y_raw = np.max(np.abs(w["Y_tr"]), axis=1)   # (N,) — raw log-return
         median_move = np.median(abs_y_raw) + 1e-9
         scaled_move = np.power(abs_y_raw / median_move, SAMPLE_WEIGHT_GAMMA)
         sw_base = 1.0 + SAMPLE_WEIGHT_MULTIPLIER * scaled_move
         sw_base = np.where(abs_y_raw > HIGH_VOL_THRESHOLD, sw_base * HIGH_VOL_WEIGHT, sw_base)
         sw_base = np.clip(sw_base, 1.0, SAMPLE_WEIGHT_CLIP_MAX).astype(np.float32)
-        # [FIX 2b] Augmentation lÃ m tÄƒng sá»‘ máº«u â†’ sw pháº£i Ä‘Æ°á»£c repeat tÆ°Æ¡ng á»©ng
-        # _augment thÃªm noise vÃ o Báº¢N COPY, khÃ´ng thÃªm sample má»›i â†’ len váº«n nhÆ° cÅ©
-        # NhÆ°ng Ä‘á»ƒ an toÃ n: align theo len(X_tr_aug)
+        # [FIX 2b] Augmentation làm tăng số mẫu → sw phải được repeat tương ứng
+        # _augment thêm noise vào BẢN COPY, không thêm sample mới → len vẫn như cũ
+        # Nhưng để an toàn: align theo len(X_tr_aug)
         n_aug = len(X_tr_aug)
         n_base = len(sw_base)
         if n_aug != n_base:
-            # Láº·p láº¡i sw_base Ä‘á»ƒ khá»›p (trÆ°á»ng há»£p augment thÃªm sample)
+            # Lặp lại sw_base để khớp (trường hợp augment thêm sample)
             repeat_times = int(np.ceil(n_aug / n_base))
             sw = np.tile(sw_base, repeat_times)[:n_aug]
         else:
@@ -1083,7 +1083,7 @@ def step09_train(
         epochs=EPOCHS,
         batch_size=BATCH_SIZE,
         callbacks=cbs,
-        shuffle=False,              # time-series: KHÃ”NG shuffle
+        shuffle=False,              # time-series: KHÔNG shuffle
         verbose=0,
     )
 
@@ -1092,13 +1092,13 @@ def step09_train(
         try:
             model = tf.keras.models.load_model(ckpt_path, compile=False)
         except Exception as e:
-            _warn(f"KhÃ´ng load Ä‘Æ°á»£c checkpoint: {e}")
+            _warn(f"Không load được checkpoint: {e}")
 
     ep_run    = len(history.history["loss"])
     best_val  = float(min(history.history.get("val_loss", [float("inf")])))
     _log(f"  [{model_name}] epochs={ep_run} | best_val_loss={best_val:.6f}")
 
-    # LÆ°u full model + history
+    # Lưu full model + history
     model.save(os.path.join(folder, f"model_{model_name}_{sc}.keras"))
     with open(os.path.join(folder, f"history_{model_name}_{sc}.json"), "w") as f:
         json.dump({
@@ -1115,7 +1115,7 @@ def step09_train(
 
 
 # =============================================================================
-# STEP 10 â€” PREDICT & EVALUATE
+# STEP 10 — PREDICT & EVALUATE
 # =============================================================================
 
 def _inverse_to_price(
@@ -1125,8 +1125,8 @@ def _inverse_to_price(
     return_scale: float = 1.0,
 ) -> np.ndarray:
     """
-    1. Inverse StandardScaler â†’ log-return thá»±c
-    2. Close_pred = last_close Ã— exp(cumsum(log_ret))
+    1. Inverse StandardScaler → log-return thực
+    2. Close_pred = last_close × exp(cumsum(log_ret))
     """
     bs, h     = pred_scaled.shape
     log_ret   = scaler_y.inverse_transform(pred_scaled.reshape(-1, 1)).reshape(bs, h)
@@ -1187,9 +1187,9 @@ def _directional_accuracy(actual, pred, last_close):
 
 def _metrics(actual: np.ndarray, pred: np.ndarray) -> dict:
     """
-    TÃ­nh RMSE, MAE, MAPE, RÂ², VolRatio trÃªn giÃ¡ Close (Ä‘Ã£ inverse transform).
-    DA Ä‘Æ°á»£c tÃ­nh riÃªng bá»Ÿi _directional_accuracy() Ä‘á»ƒ Ä‘áº£m báº£o so sÃ¡nh vá»›i Last_Close.
-    VolRatio = std(diff(pred)) / std(diff(actual)) â€” Ä‘o má»©c Ä‘á»™ biáº¿n Ä‘á»™ng dá»± bÃ¡o so thá»±c táº¿.
+    Tính RMSE, MAE, MAPE, R², VolRatio trên giá Close (đã inverse transform).
+    DA được tính riêng bởi _directional_accuracy() để đảm bảo so sánh với Last_Close.
+    VolRatio = std(diff(pred)) / std(diff(actual)) — đo mức độ biến động dự báo so thực tế.
     """
     a = actual.flatten().astype(np.float64)
     p = pred.flatten().astype(np.float64)
@@ -1201,9 +1201,9 @@ def _metrics(actual: np.ndarray, pred: np.ndarray) -> dict:
     ss_res = np.sum((a_m - p_m) ** 2)
     ss_tot = np.sum((a_m - np.mean(a_m)) ** 2)
     r2   = float(1.0 - ss_res / ss_tot) if ss_tot > 0 else 0.0
-    # VolRatio: dÃ¹ng diff Ä‘á»ƒ Ä‘o biáº¿n Ä‘á»™ng â€” náº¿u model pháº³ng thÃ¬ vr â†’ 0
+    # VolRatio: dùng diff để đo biến động — nếu model phẳng thì vr → 0
     vr   = float(np.std(np.diff(p_m)) / (np.std(np.diff(a_m)) + 1e-9)) if len(a_m) > 1 else 0.0
-    # DA KHÃ”NG tÃ­nh á»Ÿ Ä‘Ã¢y â€” tÃ­nh riÃªng báº±ng _directional_accuracy() vá»›i last_close
+    # DA KHÔNG tính ở đây — tính riêng bằng _directional_accuracy() với last_close
     return {"RMSE": round(rmse,6), "MAE": round(mae,6), "MAPE": round(mape,4),
             "R2": round(r2,6), "DA": 0.0, "VolRatio": round(vr,4)}
 
@@ -1238,9 +1238,9 @@ def _return_metrics(actual: np.ndarray, pred: np.ndarray, last_close: np.ndarray
 
 def _naive_metrics(actual: np.ndarray, last_close: np.ndarray, h: int) -> dict:
     """
-    Naive baseline: Pred_Close = Last_Close (repeat h láº§n).
-    TÃ­nh RMSE, MAE, MAPE cho baseline nÃ y.
-    Naive_DA = tá»· lá»‡ cÃ¡c bÆ°á»›c thá»±c táº¿ cÃ³ hÆ°á»›ng Ä‘Ãºng náº¿u Ä‘oÃ¡n "khÃ´ng Ä‘á»•i".
+    Naive baseline: Pred_Close = Last_Close (repeat h lần).
+    Tính RMSE, MAE, MAPE cho baseline này.
+    Naive_DA = tỷ lệ các bước thực tế có hướng đúng nếu đoán "không đổi".
     """
     naive = np.tile(last_close.reshape(-1, 1), (1, h))
     a = actual.flatten(); n = naive.flatten(); lc = naive.flatten()
@@ -1248,7 +1248,7 @@ def _naive_metrics(actual: np.ndarray, last_close: np.ndarray, h: int) -> dict:
     naive_rmse = round(float(np.sqrt(np.mean((a[mask]-n[mask])**2))), 6)
     naive_mae  = round(float(np.mean(np.abs(a[mask]-n[mask]))), 6)
     naive_mape = round(float(np.mean(np.abs((a[mask]-n[mask])/(np.abs(a[mask])+1e-9)))*100), 4)
-    # Naive DA: predict "khÃ´ng Ä‘á»•i" â†’ Ä‘Ãºng hÆ°á»›ng khi actual == last_close (hiáº¿m)
+    # Naive DA: predict "không đổi" → đúng hướng khi actual == last_close (hiếm)
     true_dir   = np.sign(a - lc)
     naive_dir  = np.zeros_like(lc)  # naive predict 0 return
     naive_da   = round(float(np.mean(true_dir == naive_dir) * 100), 2)
@@ -1269,30 +1269,30 @@ def _anti_lazy_metrics(
     h: int,
 ) -> dict:
     """
-    CÃ¡c metrics chá»‘ng lazy/copy giÃ¡:
-    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    Các metrics chống lazy/copy giá:
+    ─────────────────────────────────────────────────────
     Beats_Naive_MAPE : model_MAPE < Naive_MAPE
-    NaiveImprove_MAPE: (Naive_MAPE - Model_MAPE) / Naive_MAPE  (> 0 = tá»‘t hÆ¡n naive)
-    NaiveMAPERatio   : Te_MAPE / Naive_MAPE  (metric cÅ©, Ä‘á»•i tÃªn â€” khÃ´ng pháº£i CopyRatio thá»±c)
-    CopyRatio        : [FIX] tá»· lá»‡ dá»± bÃ¡o cÃ³ |Pred - Last_Close| / |Last_Close| < COPY_PRICE_REL_THRESHOLD
-                       â†’ cao = model Ä‘ang "copy" giÃ¡ trÆ°á»›c chá»© khÃ´ng thá»±c sá»± dá»± bÃ¡o
+    NaiveImprove_MAPE: (Naive_MAPE - Model_MAPE) / Naive_MAPE  (> 0 = tốt hơn naive)
+    NaiveMAPERatio   : Te_MAPE / Naive_MAPE  (metric cũ, đổi tên — không phải CopyRatio thực)
+    CopyRatio        : [FIX] tỷ lệ dự báo có |Pred - Last_Close| / |Last_Close| < COPY_PRICE_REL_THRESHOLD
+                       → cao = model đang "copy" giá trước chứ không thực sự dự báo
     MoveRatio        : mean(|pred - last_close|) / mean(|actual - last_close|)
-                       â†’ < MIN_MOVE_RATIO = model dá»± Ä‘oÃ¡n "pháº³ng"
+                       → < MIN_MOVE_RATIO = model dự đoán "phẳng"
     LastCloseCorr    : Pearson corr(pred_flat, last_close_rep)
-                       â†’ gáº§n 1.0 = model copy giÃ¡ trÆ°á»›c
-    ZeroReturnRatio  : % sample cÃ³ |pred_log_return_approx| < 0.001
-                       â†’ phÃ¡t hiá»‡n model luÃ´n predict return â‰ˆ 0
+                       → gần 1.0 = model copy giá trước
+    ZeroReturnRatio  : % sample có |pred_log_return_approx| < 0.001
+                       → phát hiện model luôn predict return ≈ 0
 
-    LÆ°u Ã½ horizon > 1:
-      - last_close Ä‘Æ°á»£c repeat h láº§n Ä‘á»ƒ khá»›p shape flatten
-      - CopyRatio so Pred vá»›i Last_Close Gá»C (khÃ´ng pháº£i step-by-step) Ä‘á»ƒ detect copy-price
-      - DA_test (directional accuracy) Ä‘Æ°á»£c tÃ­nh riÃªng trong step10 báº±ng _directional_accuracy()
-        cÅ©ng dÃ¹ng Last_Close gá»‘c â†’ nháº¥t quÃ¡n
-    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    Lưu ý horizon > 1:
+      - last_close được repeat h lần để khớp shape flatten
+      - CopyRatio so Pred với Last_Close GỐC (không phải step-by-step) để detect copy-price
+      - DA_test (directional accuracy) được tính riêng trong step10 bằng _directional_accuracy()
+        cũng dùng Last_Close gốc → nhất quán
+    ─────────────────────────────────────────────────────
     """
     a_flat  = actual.flatten().astype(np.float64)
     p_flat  = pred.flatten().astype(np.float64)
-    # last_close shape (N,) â†’ repeat h láº§n â†’ (N*h,) Ä‘á»ƒ khá»›p vá»›i p_flat/a_flat
+    # last_close shape (N,) → repeat h lần → (N*h,) để khớp với p_flat/a_flat
     lc_rep  = np.repeat(last_close, h).astype(np.float64)
 
     # Beats_Naive_MAPE
@@ -1303,12 +1303,12 @@ def _anti_lazy_metrics(
         float((naive["Naive_MAPE"] - model_mape) / (naive["Naive_MAPE"] + 1e-9)), 6
     )
 
-    # NaiveMAPERatio: tÃªn má»›i cá»§a "copy_ratio" cÅ© (Te_MAPE / Naive_MAPE)
-    # GiÃ¡ trá»‹ < 1.0 nghÄ©a lÃ  model tá»‘t hÆ¡n naive; khÃ´ng pháº£i "copy price"
+    # NaiveMAPERatio: tên mới của "copy_ratio" cũ (Te_MAPE / Naive_MAPE)
+    # Giá trị < 1.0 nghĩa là model tốt hơn naive; không phải "copy price"
     naive_mape_ratio = round(float(model_mape) / (float(naive["Naive_MAPE"]) + 1e-9), 4)
 
-    # [FIX] CopyRatio thá»±c sá»±: % dá»± bÃ¡o cÃ³ |Pred - Last_Close| / |Last_Close| < threshold
-    # COPY_PRICE_REL_THRESHOLD = 0.001 (0.1%) â€” náº¿u pred gáº§n nhÆ° báº±ng last_close â†’ "copy"
+    # [FIX] CopyRatio thực sự: % dự báo có |Pred - Last_Close| / |Last_Close| < threshold
+    # COPY_PRICE_REL_THRESHOLD = 0.001 (0.1%) — nếu pred gần như bằng last_close → "copy"
     rel_diff  = np.abs(p_flat - lc_rep) / (np.abs(lc_rep) + 1e-9)
     copy_ratio = round(float(np.mean(rel_diff < COPY_PRICE_REL_THRESHOLD)), 4)
 
@@ -1324,15 +1324,15 @@ def _anti_lazy_metrics(
         lcc = 1.0   # degenerate: pred is constant = last_close
     last_close_corr = round(lcc, 4)
 
-    # ZeroReturnRatio: log-return approx tá»« pred price so vá»›i last_close
+    # ZeroReturnRatio: log-return approx từ pred price so với last_close
     log_ret_pred = np.log((p_flat + 1e-9) / (lc_rep + 1e-9))
     zero_return_ratio = round(float(np.mean(np.abs(log_ret_pred) < 0.001)), 4)
 
     return {
         "Beats_Naive_MAPE":   beats_mape,
         "NaiveImprove_MAPE":  naive_improve,
-        "NaiveMAPERatio":     naive_mape_ratio,   # Ä‘á»•i tÃªn tá»« "copy_ratio" cÅ©
-        "CopyRatio":          copy_ratio,          # [FIX] Ä‘á»‹nh nghÄ©a Ä‘Ãºng
+        "NaiveMAPERatio":     naive_mape_ratio,   # đổi tên từ "copy_ratio" cũ
+        "CopyRatio":          copy_ratio,          # [FIX] định nghĩa đúng
         "MoveRatio":          move_ratio,
         "LastCloseCorr":      last_close_corr,
         "ZeroReturnRatio":    zero_return_ratio,
@@ -1340,27 +1340,27 @@ def _anti_lazy_metrics(
 
 
 # =============================================================================
-# _build_pred_df â€” module-level helper (khÃ´ng náº±m trong function nÃ o)
+# _build_pred_df — module-level helper (không nằm trong function nào)
 # =============================================================================
 
 def _build_pred_df(Y_dates: np.ndarray, actual: np.ndarray, pred: np.ndarray, h: int) -> pd.DataFrame:
     """
-    Táº¡o DataFrame dá»± bÃ¡o tá»« máº£ng raw.
+    Tạo DataFrame dự báo từ mảng raw.
 
     Args:
-        Y_dates : shape (N, h) hoáº·c (N,) â€” datetime/date cá»§a target
-        actual  : shape (N, h) â€” giÃ¡ thá»±c (Ä‘Ã£ inverse transform)
-        pred    : shape (N, h) â€” giÃ¡ dá»± bÃ¡o
+        Y_dates : shape (N, h) hoặc (N,) — datetime/date của target
+        actual  : shape (N, h) — giá thực (đã inverse transform)
+        pred    : shape (N, h) — giá dự báo
         h       : horizon (1, 3, 7)
 
     Returns:
-        DataFrame vá»›i cá»™t Date, Actual, Predicted (trung bÃ¬nh theo ngÃ y náº¿u trÃ¹ng).
-        Vá»›i h > 1 thÃªm cá»™t Step (bÆ°á»›c dá»± bÃ¡o).
+        DataFrame với cột Date, Actual, Predicted (trung bình theo ngày nếu trùng).
+        Với h > 1 thêm cột Step (bước dự báo).
 
     Note horizon > 1:
-        DA Ä‘Æ°á»£c tÃ­nh so vá»›i Last_Close gá»‘c (Lc) trong _directional_accuracy().
-        _build_pred_df chá»‰ ghi nháº­n giÃ¡ trá»‹ â€” khÃ´ng tÃ­nh direction.
-        Group-by Date láº¥y mean Ä‘á»ƒ xá»­ lÃ½ trÃ¹ng ngÃ y khi h > 1.
+        DA được tính so với Last_Close gốc (Lc) trong _directional_accuracy().
+        _build_pred_df chỉ ghi nhận giá trị — không tính direction.
+        Group-by Date lấy mean để xử lý trùng ngày khi h > 1.
     """
     rows = []
     if h == 1:
@@ -1398,8 +1398,8 @@ def step10_predict_evaluate(
     folder: str,
 ) -> dict:
     """
-    Dá»± bÃ¡o train/val/test, inverse transform â†’ giÃ¡ Close,
-    tÃ­nh metrics 3 táº­p.
+    Dự báo train/val/test, inverse transform → giá Close,
+    tính metrics 3 tập.
     """
     model    = model_result["model"]
     scaler_y = w["scaler_y"]
@@ -1431,12 +1431,12 @@ def step10_predict_evaluate(
     m_va["DA"] = _directional_accuracy(act_va, pred_va, w["Lc_va"])
     m_te["DA"] = _directional_accuracy(act_te, pred_te, w["Lc_te"])
 
-    # â”€â”€ Anti-lazy / anti-copy metrics (chá»‰ test set) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Anti-lazy / anti-copy metrics (chỉ test set) ─────────────────────────
     anti_lazy = _anti_lazy_metrics(
         act_te, pred_te, w["Lc_te"], naive, m_te["MAPE"], h
     )
     
-    # LÆ°u prediction CSV (test)
+    # Lưu prediction CSV (test)
     df_pred = _build_pred_df(w["Yd_te"], act_te, pred_te, h)
     df_pred.to_csv(os.path.join(folder, f"pred_{model_name}_{sc}.csv"), index=False)
 
@@ -1473,7 +1473,7 @@ def step10_predict_evaluate(
 
 
 # =============================================================================
-# STEP 11 â€” OVERFITTING / LAZY / COPY PRICE AUDIT
+# STEP 11 — OVERFITTING / LAZY / COPY PRICE AUDIT
 # =============================================================================
 
 def step11_overfitting_audit(ev: dict) -> dict:
@@ -1487,7 +1487,7 @@ def step11_overfitting_audit(ev: dict) -> dict:
     naive = ev["naive"]
     al    = ev.get("anti_lazy", {})
 
-    # â”€â”€ Core gap metrics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Core gap metrics ──────────────────────────────────────────────────────
     train_test_r2_gap = m_tr["R2"] - m_te["R2"]
     train_val_r2_gap = m_tr["R2"] - m_va["R2"]
     val_test_r2_gap = m_va["R2"] - m_te["R2"]
@@ -1500,30 +1500,30 @@ def step11_overfitting_audit(ev: dict) -> dict:
     return_val_test_r2_gap = r_va.get("Return_R2", 0.0) - r_te.get("Return_R2", 0.0)
     return_corr_test = r_te.get("ReturnCorr", 0.0)
 
-    # â”€â”€ Naive comparison â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Naive comparison ─────────────────────────────────────────────────────
     beats_rmse = bool(m_te["RMSE"] < naive["Naive_RMSE"])
     beats_mape = al.get("Beats_Naive_MAPE", m_te["MAPE"] < naive["Naive_MAPE"])
 
-    # [FIX] CopyRatio thá»±c sá»± (tá»« _anti_lazy_metrics Ä‘Ã£ tÃ­nh Ä‘Ãºng)
-    copy_ratio = al.get("CopyRatio", 1.0)          # % pred â‰ˆ Last_Close
-    naive_mape_ratio = al.get("NaiveMAPERatio", 1.0)  # Te_MAPE / Naive_MAPE (cÅ©)
+    # [FIX] CopyRatio thực sự (từ _anti_lazy_metrics đã tính đúng)
+    copy_ratio = al.get("CopyRatio", 1.0)          # % pred ≈ Last_Close
+    naive_mape_ratio = al.get("NaiveMAPERatio", 1.0)  # Te_MAPE / Naive_MAPE (cũ)
     move_ratio = al.get("MoveRatio", 0.0)
     lc_corr    = al.get("LastCloseCorr", 0.0)
     zero_ret   = al.get("ZeroReturnRatio", 0.0)
 
-    # â”€â”€ LazyRatio: % predictions gáº§n báº±ng Last_Close vá»›i ngÆ°á»¡ng ráº¥t cháº·t (1e-4) â”€â”€
-    # KhÃ¡c CopyRatio (ngÆ°á»¡ng 0.1%) â€” Ä‘Ã¢y lÃ  "near-exact copy" (0.01%)
+    # ── LazyRatio: % predictions gần bằng Last_Close với ngưỡng rất chặt (1e-4) ──
+    # Khác CopyRatio (ngưỡng 0.1%) — đây là "near-exact copy" (0.01%)
     pred_flat = ev["pred_te"].flatten()
     lc_rep    = np.repeat(ev["Lc_te"], ev["pred_te"].shape[1])
     diff_r    = np.abs(pred_flat - lc_rep) / (np.abs(lc_rep) + 1e-9)
     lazy_cnt  = int((diff_r < 1e-4).sum())
     lazy_ratio = lazy_cnt / max(len(pred_flat), 1)
 
-    # DA_test: Ä‘Ã£ tÃ­nh trong step10, giÃ¡ trá»‹ lÃ  % (0-100)
+    # DA_test: đã tính trong step10, giá trị là % (0-100)
     da_test = m_te["DA"]          # % (e.g. 54.2)
-    da_frac = da_test / 100.0     # chuyá»ƒn vá» tá»· lá»‡ 0-1 Ä‘á»ƒ so vá»›i MIN_DA_PASS
+    da_frac = da_test / 100.0     # chuyển về tỷ lệ 0-1 để so với MIN_DA_PASS
 
-    # â”€â”€ Lazy conditions â€” dÃ¹ng Ä‘á»ƒ Ä‘iá»n LazyDetail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Lazy conditions — dùng để điền LazyDetail ────────────────────────────
     risk_flags = []
     if not beats_rmse:
         risk_flags.append("not_beats_rmse")
@@ -1568,7 +1568,7 @@ def step11_overfitting_audit(ev: dict) -> dict:
         # Anti-lazy metrics
         "NaiveImprove_MAPE":  al.get("NaiveImprove_MAPE", 0.0),
         "NaiveMAPERatio":     naive_mape_ratio,   # Te_MAPE / Naive_MAPE
-        "CopyRatio":          copy_ratio,          # [FIX] % pred â‰ˆ Last_Close
+        "CopyRatio":          copy_ratio,          # [FIX] % pred ≈ Last_Close
         "LazyRatio":          round(lazy_ratio, 4),
         "MoveRatio":          move_ratio,
         "VolRatio":           m_te["VolRatio"],
@@ -1609,7 +1609,7 @@ def step11_overfitting_audit(ev: dict) -> dict:
 
 
 # =============================================================================
-# STEP 12 â€” ENSEMBLE + SAVE ALL RESULTS
+# STEP 12 — ENSEMBLE + SAVE ALL RESULTS
 # =============================================================================
 
 def step12_ensemble_and_save(
@@ -1618,7 +1618,7 @@ def step12_ensemble_and_save(
     ev_dict: dict,          # {model_name: eval_result}
     audit_dict: dict,       # {model_name: audit_result}
     folder: str,
-    all_rows: list,         # danh sÃ¡ch metrics rows (append vÃ o Ä‘Ã¢y)
+    all_rows: list,         # danh sách metrics rows (append vào đây)
 ) -> None:
     """
     - ensemble is disabled
@@ -1628,7 +1628,7 @@ def step12_ensemble_and_save(
     sc = scenario["name"]
     h  = scenario["horizon"]
 
-    # â”€â”€ Per-model rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Per-model rows ───────────────────────────────────────────────────────
     for mn, ev in ev_dict.items():
         aud = audit_dict.get(mn, {})
         al  = ev.get("anti_lazy", {})
@@ -1646,7 +1646,7 @@ def step12_ensemble_and_save(
         }
         all_rows.append(row)
 
-    # â”€â”€ Ensemble Ä‘Ã£ bá»‹ táº¯t â€” chá»‰ lÆ°u per-model metrics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Ensemble đã bị tắt — chỉ lưu per-model metrics ─────────────────────
 
 
 
@@ -1665,14 +1665,14 @@ def _warn(msg: str) -> None: print(f"  [WARN] {msg}")
 
 def _save_all_metrics(all_rows: list, results_dir: str) -> pd.DataFrame:
     if not all_rows:
-        _warn("KhÃ´ng cÃ³ metrics Ä‘á»ƒ lÆ°u!")
+        _warn("Không có metrics để lưu!")
         return pd.DataFrame()
     df = pd.DataFrame(all_rows)
     path = os.path.join(results_dir, "merged_metrics_ALL.csv")
     df.to_csv(path, index=False)
-    _log(f"LÆ°u tá»•ng há»£p â†’ {path}  ({len(df)} rows)")
+    _log(f"Lưu tổng hợp → {path}  ({len(df)} rows)")
 
-    # LÆ°u riÃªng tá»«ng ticker
+    # Lưu riêng từng ticker
     for ticker, grp in df.groupby("Ticker"):
         p = os.path.join(results_dir, ticker, f"metrics_{ticker}.csv")
         os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -1715,9 +1715,9 @@ def _save_all_metrics(all_rows: list, results_dir: str) -> pd.DataFrame:
             ).reset_index(drop=True)
             sp = os.path.join(results_dir, "visual_diagnostics_summary.csv")
             df_summary.to_csv(sp, index=False)
-            _log(f"LÆ°u summary  â†’ {sp}")
+            _log(f"Lưu summary  → {sp}")
         except Exception as e:
-            _warn(f"KhÃ´ng táº¡o Ä‘Æ°á»£c visual_diagnostics_summary: {e}")
+            _warn(f"Không tạo được visual_diagnostics_summary: {e}")
 
     return df
 
@@ -1755,35 +1755,35 @@ def _print_summary(df: pd.DataFrame) -> None:
 # =============================================================================
 
 def main():
-    _banner("VN30 STOCK PRICE PREDICTION â€” 12-STEP PIPELINE")
+    _banner("VN30 STOCK PRICE PREDICTION — 12-STEP PIPELINE")
     os.makedirs(RESULTS_DIR, exist_ok=True)
     all_rows = []
     runtime_rows = []
     pipeline_start = time.perf_counter()
 
-    # â”€â”€ STEP 01 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── STEP 01 ───────────────────────────────────────────────────────────────
     df_raw = step01_load_validate(DATA_FILE)
 
-    # â”€â”€ STEP 02 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── STEP 02 ───────────────────────────────────────────────────────────────
     df_clean = step02_handle_missing(df_raw)
 
-    # â”€â”€ STEP 03 â€” Feature engineering per ticker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── STEP 03 — Feature engineering per ticker ─────────────────────────────
     # FE is still done per-ticker (rolling indicators, no look-ahead).
     # train/val/test splitting is done GLOBALLY afterward.
     feat_dict = step03_feature_engineering(df_clean)
 
-    # â”€â”€ STEP 04 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── STEP 04 ───────────────────────────────────────────────────────────────
     clean_dict = step04_clean_features(feat_dict)
 
-    # â”€â”€ COMBINE all tickers into one DataFrame â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    _banner("COMBINE ALL TICKERS â†’ SINGLE DATAFRAME")
+    # ── COMBINE all tickers into one DataFrame ────────────────────────────────
+    _banner("COMBINE ALL TICKERS → SINGLE DATAFRAME")
     df_combined = pd.concat(list(clean_dict.values()), ignore_index=True)
     df_combined["TradingDate"] = pd.to_datetime(df_combined["TradingDate"])
     df_combined = df_combined.sort_values(["Ticker", "TradingDate"]).reset_index(drop=True)
     _log(f"Combined shape : {df_combined.shape}")
     _log(f"Tickers        : {df_combined['Ticker'].nunique()}")
 
-    # â”€â”€ STRICT COMMON DATE FILTER (Option A) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── STRICT COMMON DATE FILTER (Option A) ─────────────────────────────────
     _banner("STRICT COMMON DATE FILTER (Option A)")
     n_original_dates = df_combined["TradingDate"].nunique()
 
@@ -1802,14 +1802,14 @@ def main():
         os.makedirs(os.path.dirname(COMMON_DATE_REPORT_PATH), exist_ok=True)
         ticker_count_report.to_csv(COMMON_DATE_REPORT_PATH, index=False,
                                    encoding="utf-8-sig")
-        _log(f"Saved common_date_report â†’ {COMMON_DATE_REPORT_PATH}")
+        _log(f"Saved common_date_report → {COMMON_DATE_REPORT_PATH}")
     else:
-        _log("USE_STRICT_COMMON_DATES=False â€” skipping common-date filter")
+        _log("USE_STRICT_COMMON_DATES=False — skipping common-date filter")
 
     n_common_dates  = df_combined["TradingDate"].nunique()
     n_removed_dates = n_original_dates - n_common_dates
 
-    # â”€â”€ GLOBAL DATE SPLIT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── GLOBAL DATE SPLIT ─────────────────────────────────────────────────────
     _banner("GLOBAL DATE SPLIT")
     train_end_date, val_end_date, test_start_date = get_global_split_dates(
         df_combined,
@@ -1823,7 +1823,7 @@ def main():
         df_combined, train_end_date, val_end_date, date_col="TradingDate"
     )
 
-    # â”€â”€ VALIDATION CHECKS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── VALIDATION CHECKS ────────────────────────────────────────────────────
     # NOTE: USE_TEST_MODE only limits which tickers are used for training/testing
     # (speed). Strict common-date filtering always uses EXPECTED_TICKER_COUNT=30
     # so the common trading calendar is derived from the full VN30 universe,
@@ -1835,7 +1835,7 @@ def main():
         expected_tickers=expected_for_validation,
     )
 
-    # â”€â”€ SAVE GLOBAL SPLIT SUMMARY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── SAVE GLOBAL SPLIT SUMMARY ────────────────────────────────────────────
     save_global_split_summary(
         global_train_df, global_val_df, global_test_df,
         output_path=SPLIT_SUMMARY_PATH,
@@ -1851,13 +1851,13 @@ def main():
         tickers = [t for t in TEST_TICKERS if t in clean_dict]
         missing = [t for t in TEST_TICKERS if t not in clean_dict]
         if missing:
-            _warn(f"[TEST MODE] KhÃ´ng tÃ¬m tháº¥y ticker: {missing}")
-        _log(f"[TEST MODE] Chá»‰ cháº¡y thá»­: {tickers}")
+            _warn(f"[TEST MODE] Không tìm thấy ticker: {missing}")
+        _log(f"[TEST MODE] Chỉ chạy thử: {tickers}")
     else:
         tickers = sorted(clean_dict.keys())
 
     total = len(tickers)
-    _log(f"Báº¯t Ä‘áº§u train: {total} tickers")
+    _log(f"Bắt đầu train: {total} tickers")
 
     for idx, ticker in enumerate(tickers, 1):
         ticker_start = time.perf_counter()
@@ -1866,32 +1866,32 @@ def main():
 
         for scenario in SCENARIOS:
             sc   = scenario["name"]
-            _log(f"\n  â”€â”€ {scenario['label']} â”€â”€")
+            _log(f"\n  ── {scenario['label']} ──")
 
             folder = os.path.join(RESULTS_DIR, ticker, sc)
             os.makedirs(folder, exist_ok=True)
 
-            # â”€â”€ STEP 05 â€” use global date boundaries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            _banner(f"STEP 05 â€” SPLIT [{ticker}|{sc}]")
+            # ── STEP 05 — use global date boundaries ─────────────────────────
+            _banner(f"STEP 05 — SPLIT [{ticker}|{sc}]")
             df_tr, df_va, df_te, split_info = step05_split(
                 df_tick,
                 train_end_date=train_end_date,
                 val_end_date=val_end_date,
             )
 
-            # â”€â”€ STEP 06 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            _banner(f"STEP 06 â€” SAVE PRE-TRAIN [{ticker}|{sc}]")
+            # ── STEP 06 ──────────────────────────────────────────────────────
+            _banner(f"STEP 06 — SAVE PRE-TRAIN [{ticker}|{sc}]")
             step06_save_pretrain(ticker, scenario, df_tick, df_tr, df_va, df_te, split_info, RESULTS_DIR)
 
-            # â”€â”€ STEP 07 â”€â”€ Scaler fit ONLY on train to prevent leakage â”€â”€â”€â”€â”€â”€â”€
-            _banner(f"STEP 07 â€” SCALE [{ticker}|{sc}]")
+            # ── STEP 07 ── Scaler fit ONLY on train to prevent leakage ───────
+            _banner(f"STEP 07 — SCALE [{ticker}|{sc}]")
             (scaler_x,
              tr_sc, va_sc, te_sc,
              tr_dt, va_dt, te_dt,
              raw_tr, raw_va, raw_te) = step07_scale(df_tr, df_va, df_te, folder)
 
-            # â”€â”€ STEP 08 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            _banner(f"STEP 08 â€” SLIDING WINDOWS [{ticker}|{sc}]")
+            # ── STEP 08 ──────────────────────────────────────────────────────
+            _banner(f"STEP 08 — SLIDING WINDOWS [{ticker}|{sc}]")
             w = step08_sliding_windows(
                 tr_sc, va_sc, te_sc,
                 raw_tr, raw_va, raw_te,
@@ -1905,28 +1905,28 @@ def main():
             audit_dict = {}
 
             for model_name in MODEL_NAMES:
-                # â”€â”€ STEP 09 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                _banner(f"STEP 09 â€” TRAIN {model_name} [{ticker}|{sc}]")
+                # ── STEP 09 ──────────────────────────────────────────────────
+                _banner(f"STEP 09 — TRAIN {model_name} [{ticker}|{sc}]")
                 model_result = step09_train(w, model_name, scenario, folder)
 
                 if model_result is None:
                     continue
 
-                # â”€â”€ STEP 10 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                _banner(f"STEP 10 â€” EVALUATE {model_name} [{ticker}|{sc}]")
+                # ── STEP 10 ──────────────────────────────────────────────────
+                _banner(f"STEP 10 — EVALUATE {model_name} [{ticker}|{sc}]")
                 ev = step10_predict_evaluate(model_result, w, scenario, model_name, ticker, folder)
                 ev_dict[model_name] = ev
 
-                # â”€â”€ STEP 11 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                _banner(f"STEP 11 â€” AUDIT {model_name} [{ticker}|{sc}]")
+                # ── STEP 11 ──────────────────────────────────────────────────
+                _banner(f"STEP 11 — AUDIT {model_name} [{ticker}|{sc}]")
                 aud = step11_overfitting_audit(ev)
                 audit_dict[model_name] = aud
 
                 del model_result["model"]
                 tf.keras.backend.clear_session()
 
-            # â”€â”€ STEP 12 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            _banner(f"STEP 12 â€” ENSEMBLE & SAVE [{ticker}|{sc}]")
+            # ── STEP 12 ──────────────────────────────────────────────────────
+            _banner(f"STEP 12 — ENSEMBLE & SAVE [{ticker}|{sc}]")
             step12_ensemble_and_save(ticker, scenario, ev_dict, audit_dict, folder, all_rows)
 
         ticker_seconds = time.perf_counter() - ticker_start
@@ -1937,7 +1937,7 @@ def main():
         })
         _log(f"Hoan thanh {ticker} | runtime={ticker_seconds / 60.0:.2f} minutes")
 
-    # â”€â”€ LÆ°u tá»•ng há»£p â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Lưu tổng hợp ─────────────────────────────────────────────────────────
     df_all = _save_all_metrics(all_rows, RESULTS_DIR)
     _print_summary(df_all)
     total_seconds = time.perf_counter() - pipeline_start
@@ -1951,27 +1951,27 @@ def main():
         pd.DataFrame(runtime_rows).to_csv(runtime_path, index=False, encoding="utf-8-sig")
         _log(f"Luu runtime summary -> {runtime_path}")
 
-    # â”€â”€ FINAL EXPLANATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    _banner("PIPELINE HOÃ€N Táº¤T â€” STRICT COMMON DATES SUMMARY")
+    # ── FINAL EXPLANATION ─────────────────────────────────────────────────────
+    _banner("PIPELINE HOÀN TẤT — STRICT COMMON DATES SUMMARY")
     _log(f"Original trading dates          : {n_original_dates:,}")
     _log(f"Common trading dates kept       : {n_common_dates:,}")
     _log(f"Trading dates removed           : {n_removed_dates:,}")
     _log(f"Train date range                : "
-         f"{global_train_df['TradingDate'].min().date()} â†’ "
+         f"{global_train_df['TradingDate'].min().date()} → "
          f"{global_train_df['TradingDate'].max().date()}")
     _log(f"Validation date range           : "
-         f"{global_val_df['TradingDate'].min().date()} â†’ "
+         f"{global_val_df['TradingDate'].min().date()} → "
          f"{global_val_df['TradingDate'].max().date()}")
     _log(f"Test date range                 : "
-         f"{global_test_df['TradingDate'].min().date()} â†’ "
+         f"{global_test_df['TradingDate'].min().date()} → "
          f"{global_test_df['TradingDate'].max().date()}")
     _log(f"All tickers aligned on same split calendar : "
-         f"{'YES âœ“' if USE_STRICT_COMMON_DATES else 'NO (legacy mode)'}")
+         f"{'YES ' if USE_STRICT_COMMON_DATES else 'NO (legacy mode)'}")
     _log(f"Files modified                  : config.py, main.py")
     _log(f"Reports saved                   :")
-    _log(f"  â†’ {COMMON_DATE_REPORT_PATH}")
-    _log(f"  â†’ {SPLIT_SUMMARY_PATH}")
-    _log(f"Káº¿t quáº£ táº¡i: {os.path.abspath(RESULTS_DIR)}/")
+    _log(f"  → {COMMON_DATE_REPORT_PATH}")
+    _log(f"  → {SPLIT_SUMMARY_PATH}")
+    _log(f"Kết quả tại: {os.path.abspath(RESULTS_DIR)}/")
 
 
 

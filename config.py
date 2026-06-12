@@ -1,18 +1,18 @@
-﻿# =============================================================================
+# =============================================================================
 # config.py
-# ToÃ n bá»™ háº±ng sá»‘ táº­p trung táº¡i Ä‘Ã¢y â€” cÃ¡c file khÃ¡c chá»‰ import tá»« Ä‘Ã¢y.
+# Toàn bộ hằng số tập trung tại đây — các file khác chỉ import từ đây.
 # =============================================================================
 
 import os
 
-# â”€â”€ ÄÆ°á»ng dáº«n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Đường dẫn ────────────────────────────────────────────────────────────────
 DATA_FILE   = "D:/DACS/3.0/Dataset_VN30_2016_2026.csv"
 RESULTS_DIR = "D:/DACS/3.0/results"
 
-# â”€â”€ Dá»¯ liá»‡u â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-MIN_TICKER_ROWS = 300   # Bá» qua ticker cÃ³ < 300 rows sau feature engineering
+# ── Dữ liệu ──────────────────────────────────────────────────────────────────
+MIN_TICKER_ROWS = 300   # Bỏ qua ticker có < 300 rows sau feature engineering
 
-# â”€â”€ Test mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Test mode ────────────────────────────────────────────────────────────────
 USE_TEST_MODE = os.getenv("USE_TEST_MODE", "0") == "1" # True = test, False = full run
 TEST_TICKERS = [
     t.strip()
@@ -20,40 +20,40 @@ TEST_TICKERS = [
     if t.strip()
 ]
 
-# â”€â”€ Chronological split â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Chronological split ───────────────────────────────────────────────────────
 TRAIN_RATIO = 0.70      # 70% train
 VAL_RATIO   = 0.15      # 15% validation
-TEST_RATIO  = 0.15      # 15% test (pháº§n cÃ²n láº¡i)
+TEST_RATIO  = 0.15      # 15% test (phần còn lại)
 
-# â”€â”€ Strict Common Dates (Option A) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Chá»‰ giá»¯ láº¡i ngÃ y giao dá»‹ch cÃ³ Ä‘á»§ táº¥t cáº£ tickers â†’ Ä‘áº£m báº£o má»i ticker dÃ¹ng
-# cÃ¹ng lá»‹ch giao dá»‹ch vÃ  cÃ¹ng ranh giá»›i train/val/test.
-USE_STRICT_COMMON_DATES  = True    # True = báº­t lá»c ngÃ y chung
-EXPECTED_TICKER_COUNT    = 30      # Sá»‘ tickers cáº§n cÃ³ máº·t trong má»—i ngÃ y giao dá»‹ch
+# ── Strict Common Dates (Option A) ────────────────────────────────────────────
+# Chỉ giữ lại ngày giao dịch có đủ tất cả tickers → đảm bảo mọi ticker dùng
+# cùng lịch giao dịch và cùng ranh giới train/val/test.
+USE_STRICT_COMMON_DATES  = True    # True = bật lọc ngày chung
+EXPECTED_TICKER_COUNT    = 30      # Số tickers cần có mặt trong mỗi ngày giao dịch
 
-# ÄÆ°á»ng dáº«n bÃ¡o cÃ¡o â€” dÃ¹ng RESULTS_DIR Ä‘á»ƒ nháº¥t quÃ¡n vá»›i má»i output khÃ¡c
+# Đường dẫn báo cáo — dùng RESULTS_DIR để nhất quán với mọi output khác
 COMMON_DATE_REPORT_PATH  = os.path.join(RESULTS_DIR, "common_date_report.csv")
 SPLIT_SUMMARY_PATH       = os.path.join(RESULTS_DIR, "global_split_summary.csv")
 
-# â”€â”€ 3 ká»‹ch báº£n sliding window â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── 3 kịch bản sliding window ────────────────────────────────────────────────
 SCENARIOS = [
     {"name": "scenario_1", "label": "Scenario 1 (Lookback=20,  Horizon=1)", "lookback": 20,  "horizon": 1},
     {"name": "scenario_2", "label": "Scenario 2 (Lookback=40,  Horizon=3)", "lookback": 40,  "horizon": 3},
     {"name": "scenario_3", "label": "Scenario 3 (Lookback=100, Horizon=7)", "lookback": 100, "horizon": 7},
 ]
 
-# â”€â”€ Features dÃ¹ng Ä‘á»ƒ train â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Bao gá»“m Open, High, Low, Close (4 cá»™t báº¯t buá»™c theo yÃªu cáº§u)
-# Loáº¡i bá» DELTA_* (khÃ´ng trong yÃªu cáº§u)
+# ── Features dùng để train ────────────────────────────────────────────────────
+# Bao gồm Open, High, Low, Close (4 cột bắt buộc theo yêu cầu)
+# Loại bỏ DELTA_* (không trong yêu cầu)
 FEATURE_COLS = [
-    # 4 cá»™t OHLC báº¯t buá»™c
+    # 4 cột OHLC bắt buộc
     "open_close_ratio",
     "high_close_ratio",
     "low_close_ratio",
     # Returns
     "return_1d",
     "log_return_1d",
-    # Spread ná»™i ngÃ y
+    # Spread nội ngày
     "hl_range_ratio",
     "oc_change_ratio",
     # Volume
@@ -94,10 +94,10 @@ FEATURE_COLS = [
 
 N_FEATURES = len(FEATURE_COLS)
 
-# â”€â”€ Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Models ───────────────────────────────────────────────────────────────────
 MODEL_NAMES   = ["RNN", "LSTM", "GRU" ]
 
-# â”€â”€ Huáº¥n luyá»‡n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Huấn luyện ───────────────────────────────────────────────────────────────
 EPOCHS     = 80
 BATCH_SIZE = 64
 INITIAL_LR = 5e-4
@@ -112,29 +112,29 @@ REDUCE_LR_FACTOR   = 0.5
 REDUCE_LR_PATIENCE = 5
 REDUCE_LR_MIN_LR   = 1e-7
 
-# Patience riÃªng cho horizon=3
+# Patience riêng cho horizon=3
 H3_EARLY_STOPPING_PATIENCE = 14
 H3_REDUCE_LR_PATIENCE      = 5
 H3_WARMUP_EPOCHS           = 5
 
-# Patience riÃªng cho horizon=7
+# Patience riêng cho horizon=7
 H7_EARLY_STOPPING_PATIENCE = 14
 H7_REDUCE_LR_PATIENCE      = 5
 
-# â”€â”€ Regularization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Regularization ───────────────────────────────────────────────────────────
 DROPOUT_RATE = 0.15
 L2_LAMBDA    = 1e-4
 
-# ParHybrid dÃ¹ng regularization máº¡nh hÆ¡n
+# ParHybrid dùng regularization mạnh hơn
 PARHYBRID_L2_OVERRIDE  = 1e-3
 PARHYBRID_SPATIAL_DROP = 0.50
 PARHYBRID_GRAD_CLIP    = 0.8
 
-# â”€â”€ Chá»‘ng overfitting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-LABEL_SMOOTH_ALPHA = 0.0    # Giáº£m tá»« 0.10 â†’ 0.02: train signal rÃµ hÆ¡n, loss khÃ´ng bá»‹ má»
-AUG_NOISE_STD_X    = 0.004  # Giáº£m tá»« 0.012 â†’ 0.008: khÃ´ng Ã¡t signal khi label smooth Ä‘Ã£ tháº¥p
-AUG_NOISE_STD_Y    = 0.0    # Giáº£m tá»« 0.004 â†’ 0.002
-AUG_PROB           = 0.25   # Giáº£m tá»« 0.60 â†’ 0.40: augment Ã­t hÆ¡n, model há»c signal rÃµ hÆ¡n
+# ── Chống overfitting ────────────────────────────────────────────────────────
+LABEL_SMOOTH_ALPHA = 0.0    # Giảm từ 0.10 → 0.02: train signal rõ hơn, loss không bị mờ
+AUG_NOISE_STD_X    = 0.004  # Giảm từ 0.012 → 0.008: không át signal khi label smooth đã thấp
+AUG_NOISE_STD_Y    = 0.0    # Giảm từ 0.004 → 0.002
+AUG_PROB           = 0.25   # Giảm từ 0.60 → 0.40: augment ít hơn, model học signal rõ hơn
 MC_DROPOUT_SAMPLES = 20     # Monte Carlo dropout inference
 
 # Directional loss weights
@@ -142,9 +142,9 @@ DIR_LOSS_WEIGHT_H1 = 0.15
 DIR_LOSS_WEIGHT_H3 = 0.12
 DIR_LOSS_WEIGHT_H7 = 0.10
 
-# Directional loss: pháº¡t khi dá»± Ä‘oÃ¡n sai chiá»u (actual tÄƒng nhÆ°ng pred giáº£m)
+# Directional loss: phạt khi dự đoán sai chiều (actual tăng nhưng pred giảm)
 # directional_loss = mean( max(0, -sign(y_true) * y_pred) )
-USE_DIR_LOSS       = True   # Báº­t directional penalty
+USE_DIR_LOSS       = True   # Bật directional penalty
 
 # Magnitude constraint
 MAG_CONSTRAINT_RATIO  = 0.35
@@ -153,34 +153,34 @@ MIN_PRED_MOVE_STD     = 0.12
 ZERO_MOVE_PENALTY_WEIGHT = 0.08
 RETURN_CORR_LOSS_WEIGHT  = 0.08
 
-# â”€â”€ NgÆ°á»¡ng Ä‘Ã¡nh giÃ¡ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-OVERFIT_R2_GAP_THRESHOLD = 0.020   # RÂ²_gap > 0.02 â†’ WARN_OVERFIT
-DA_PASS_THRESHOLD        = 55.0    # DA% â‰¥ 55% â†’ PASS
-DA_WARN_THRESHOLD        = 52.0    # DA% < 52% â†’ WARN_LAZY
-VOLRATIO_TARGET_MIN      = 0.85    # VolRatio < 0.85 â†’ WARN
-VOLRATIO_TARGET_MAX      = 1.15    # VolRatio > 1.15 â†’ WARN
-LAZY_PASS_THRESHOLD      = 0.05    # LazyRatio > 5% â†’ WARN_LAZY
-MAPE_MIN_THRESHOLD       = 0.80    # MAPE < 0.8% â†’ suspect lazy
-MAPE_MAX_THRESHOLD       = 2.00    # MAPE > 2.0% â†’ too noisy
+# ── Ngưỡng đánh giá ──────────────────────────────────────────────────────────
+OVERFIT_R2_GAP_THRESHOLD = 0.020   # R²_gap > 0.02 → WARN_OVERFIT
+DA_PASS_THRESHOLD        = 55.0    # DA% ≥ 55% → PASS
+DA_WARN_THRESHOLD        = 52.0    # DA% < 52% → WARN_LAZY
+VOLRATIO_TARGET_MIN      = 0.85    # VolRatio < 0.85 → WARN
+VOLRATIO_TARGET_MAX      = 1.15    # VolRatio > 1.15 → WARN
+LAZY_PASS_THRESHOLD      = 0.05    # LazyRatio > 5% → WARN_LAZY
+MAPE_MIN_THRESHOLD       = 0.80    # MAPE < 0.8% → suspect lazy
+MAPE_MAX_THRESHOLD       = 2.00    # MAPE > 2.0% → too noisy
 
 # Anti-lazy movement thresholds
 # MoveRatio = mean(|Pred-LastClose|) / mean(|Actual-LastClose|)
-# < MIN_MOVE_RATIO â†’ model predict quÃ¡ pháº³ng (khÃ´ng dÃ¡m "di chuyá»ƒn")
-MIN_MOVE_RATIO           = 0.35    # Dá»± bÃ¡o pháº£i cÃ³ Ã­t nháº¥t 35% biÃªn Ä‘á»™ cá»§a thá»±c táº¿
+# < MIN_MOVE_RATIO → model predict quá phẳng (không dám "di chuyển")
+MIN_MOVE_RATIO           = 0.35    # Dự báo phải có ít nhất 35% biên độ của thực tế
 
-# â”€â”€ [Cáº¢I TIáº¾N 2] Sample weight cho ngÃ y biáº¿n Ä‘á»™ng lá»›n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-USE_SAMPLE_WEIGHTS       = True    # Báº­t/táº¯t sample weighting
-SAMPLE_WEIGHT_GAMMA      = 2.0     # MÅ© khuáº¿ch Ä‘áº¡i: weight = (|return| / median) ^ gamma
-SAMPLE_WEIGHT_CLIP_MAX   = 5.0    # Clamp weight tá»‘i Ä‘a â€” trÃ¡nh 1 sample chiáº¿m quÃ¡ nhiá»u gradient
-SAMPLE_WEIGHT_MULTIPLIER = 4.0    # Há»‡ sá»‘ nhÃ¢n (giáº£m tá»« 10 â†’ 5 Ä‘á»ƒ á»•n Ä‘á»‹nh hÆ¡n)
-# NgÆ°á»¡ng phÃ¢n loáº¡i "ngÃ y biáº¿n Ä‘á»™ng lá»›n": |log_return| > HIGH_VOL_THRESHOLD
-# NgÃ y thÆ°á»ng â†’ weight=1.0, ngÃ y biáº¿n Ä‘á»™ng lá»›n â†’ weight=HIGH_VOL_WEIGHT
+# ── [CẢI TIẾN 2] Sample weight cho ngày biến động lớn ────────────────────────
+USE_SAMPLE_WEIGHTS       = True    # Bật/tắt sample weighting
+SAMPLE_WEIGHT_GAMMA      = 2.0     # Mũ khuếch đại: weight = (|return| / median) ^ gamma
+SAMPLE_WEIGHT_CLIP_MAX   = 5.0    # Clamp weight tối đa — tránh 1 sample chiếm quá nhiều gradient
+SAMPLE_WEIGHT_MULTIPLIER = 4.0    # Hệ số nhân (giảm từ 10 → 5 để ổn định hơn)
+# Ngưỡng phân loại "ngày biến động lớn": |log_return| > HIGH_VOL_THRESHOLD
+# Ngày thường → weight=1.0, ngày biến động lớn → weight=HIGH_VOL_WEIGHT
 HIGH_VOL_THRESHOLD       = 0.015  # 1.5% log-return
-HIGH_VOL_WEIGHT          = 5.0    # Giáº£m tá»« 10 â†’ 5: gradient á»•n Ä‘á»‹nh hÆ¡n, khÃ´ng bá»‹ spike
+HIGH_VOL_WEIGHT          = 5.0    # Giảm từ 10 → 5: gradient ổn định hơn, không bị spike
 
-# â”€â”€ [Cáº¢I TIáº¾N 3] Huber loss â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── [CẢI TIẾN 3] Huber loss ───────────────────────────────────────────────────
 USE_HUBER_LOSS           = True    # True = Huber, False = MSE
-HUBER_DELTA              = 1.0     # delta=1.0: gáº§n MAE khi sai sá»‘ lá»›n, MSE khi nhá»
+HUBER_DELTA              = 1.0     # delta=1.0: gần MAE khi sai số lớn, MSE khi nhỏ
 
 # Diagnostic thresholds used for charts and RiskFlags. They are not PASS/FAIL grades.
 PASS_REQUIRE_BEATS_NAIVE = True
@@ -188,20 +188,20 @@ PASS_MIN_DA              = 52.0
 PASS_REQUIRE_MAPE_BEAT   = True
 PASS_MAX_COPY_RATIO      = 0.60
 
-# â”€â”€ [FIX] NgÆ°á»¡ng CopyRatio thá»±c sá»± â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# CopyRatio = tá»· lá»‡ dá»± bÃ¡o cÃ³ |Pred_Close - Last_Close| / |Last_Close| < threshold
-# KhÃ¡c vá»›i NaiveMAPERatio = Te_MAPE / Naive_MAPE (metric cÅ©, Ä‘á»•i tÃªn)
-COPY_PRICE_REL_THRESHOLD = 0.001   # 0.1% â€” náº¿u pred chÃªnh < 0.1% so Last_Close â†’ "copy"
+# ── [FIX] Ngưỡng CopyRatio thực sự ───────────────────────────────────────────
+# CopyRatio = tỷ lệ dự báo có |Pred_Close - Last_Close| / |Last_Close| < threshold
+# Khác với NaiveMAPERatio = Te_MAPE / Naive_MAPE (metric cũ, đổi tên)
+COPY_PRICE_REL_THRESHOLD = 0.001   # 0.1% — nếu pred chênh < 0.1% so Last_Close → "copy"
 
-# â”€â”€ [FIX] NgÆ°á»¡ng WARN_LAZY vÃ  MIN_DA_PASS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-MAX_LAZY_RATIO           = 0.60    # LazyRatio > 60% â†’ WARN_LAZY
-MIN_DA_PASS              = 0.52    # DA_test < 52% â†’ WARN_LOW_DA (tá»· lá»‡, khÃ´ng pháº£i %)
+# ── [FIX] Ngưỡng WARN_LAZY và MIN_DA_PASS ────────────────────────────────────
+MAX_LAZY_RATIO           = 0.60    # LazyRatio > 60% → WARN_LAZY
+MIN_DA_PASS              = 0.52    # DA_test < 52% → WARN_LOW_DA (tỷ lệ, không phải %)
 
 # Validation-time return calibration. This post-processes predicted log-returns
 # with one scalar selected on validation data to reduce flat/copy forecasts.
 USE_RETURN_CALIBRATION = True
 RETURN_SCALE_CANDIDATES = [0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0]
 
-# â”€â”€ Seed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Seed ─────────────────────────────────────────────────────────────────────
 SEED = 42
 
