@@ -4,6 +4,7 @@ __pycache__/
 # Data, trained models, generated reports, and experiment outputs
 results/
 Dataset_*.csv
+rebuild_metrics.py
 *.pdf
 *.keras
 *.pkl
