@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+
+# Data, trained models, generated reports, and experiment outputs
+results/
+Dataset_*.csv
+*.pdf
+*.keras
+*.pkl
+*.png
+
+# Local/editor files
+.vscode/
+.idea/
+*.tmp
+*.bak
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
