@@ -1,42 +1,46 @@
-# Dự đoán giá chứng khoán VN30
+# Du doan gia chung khoan VN30
 
-Đồ án xây dựng pipeline dự báo giá đóng cửa cho 30 mã VN30 bằng RNN, LSTM và GRU. Dữ liệu đầu vào là `Dataset_VN30_2016_2026.csv`; kết quả chạy, metrics, model và biểu đồ được lưu trong thư mục `results/`.
+Repo nay chi chua source code cho do an du bao gia dong cua 30 ma VN30 bang RNN, LSTM va GRU.
 
-## Nội dung chính
+Data, model da train, results, chart va file PDF bao cao khong duoc dua len GitHub. Cac file nay duoc ignore trong `.gitignore` de repo gon va dung yeu cau "code only".
 
-- `main.py`: pipeline huấn luyện và đánh giá mô hình.
-- `config.py`: cấu hình danh sách feature, scenario, model và hyperparameter.
-- `rebuild_metrics.py`: rebuild lại metrics từ các model/artifact đã huấn luyện.
-- `visualize_model_report.py`: tạo biểu đồ trực quan hóa từ `results/merged_metrics_ALL.csv`.
-- `CRAWVN30.py`: script thu thập dữ liệu ban đầu bằng `vnstock`.
-- `DACS_2386400763_NguyenLePhuAn.pdf`: file báo cáo PDF.
-- `results/`: kết quả chạy thực nghiệm, model, prediction, metrics và chart.
+## File chinh
 
-## Cài đặt
+- `main.py`: pipeline huan luyen va danh gia mo hinh.
+- `config.py`: cau hinh feature, scenario, model va hyperparameter.
+- `rebuild_metrics.py`: rebuild metrics tu artifact da huan luyen.
+- `visualize_model_report.py`: ve bieu do tu `results/merged_metrics_ALL.csv`.
+- `CRAWVN30.py`: script thu thap du lieu ban dau bang `vnstock`.
+- `requirements.txt`: danh sach thu vien Python can cai.
+
+## Cai dat
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Chạy pipeline
+## Chay pipeline
+
+Dat file du lieu `Dataset_VN30_2016_2026.csv` vao thu muc goc project, sau do chay:
 
 ```bash
 python main.py
 ```
 
-## Rebuild metrics khi đã có artifact
+## Rebuild metrics
+
+Khi da co artifact trong thu muc `results/`, co the tinh lai metrics bang:
 
 ```bash
 python rebuild_metrics.py --results-dir results --write-predictions
 ```
 
-## Vẽ biểu đồ báo cáo
+## Ve bieu do
 
 ```bash
 python visualize_model_report.py --results-dir results --max-detail-plots 0
 ```
 
-## Ghi chú dữ liệu
+## Ghi chu
 
-File dữ liệu thô có 68,069 dòng cho 30 mã VN30. Trong lần chạy cuối, pipeline dùng strict common dates nên vùng dữ liệu chung sau feature engineering là từ 2021-04-20 đến 2026-04-17.
-
+Thu muc `results/`, file data `.csv`, model `.keras`, scaler `.pkl`, anh `.png` va PDF bao cao deu duoc ignore. Neu can tai lap day du ket qua, can co data va chay lai pipeline tren may local.
